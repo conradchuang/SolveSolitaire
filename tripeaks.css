@@ -1,0 +1,35 @@
+.tripeaks-controls {
+    width: 10%;
+    float: right;
+    text-align: center;
+}
+.tripeaks-controls-button {
+    width: 100%;
+}
+.tripeaks-pyramids {
+    width: 85%;
+    background-image: url("images/background.jpg");
+    background-size: 100% 100%;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+.tripeaks-cards-table {
+    width: 85%;
+    background-color: lightgray;
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+.tripeaks-div {
+    position: relative;
+}
+.tripeaks-waste {
+    float: right;
+    margin-left: 1rem;
+}
+.tripeaks-card {
+    position: absolute;
+}
+.tripeaks-center {
+    transform: translateX(-50%);
+}
