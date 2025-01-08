@@ -6,6 +6,18 @@
 .tripeaks-controls-button {
     width: 100%;
 }
+.tripeaks-solution-controls {
+    border: 1px solid black;
+    border-radius: 1rem;
+    margin-bottom: 1rem;
+}
+.tripeaks-s-c-button {
+    width: 1.5rem;
+    padding: 0.5rem;
+}
+.tripeaks-s-c-button:disabled {
+    opacity: 0.5;
+}
 .tripeaks-pyramids {
     width: 85%;
     background-image: url("images/background.jpg");

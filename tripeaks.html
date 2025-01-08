@@ -5,6 +5,7 @@
   <link rel="stylesheet" href="cards_table.css"/>
   <link rel="stylesheet" href="tripeaks.css"/>
   <script type="text/javascript" src="cards_table.js"></script>
+  <script type="text/javascript" src="player_controls.js"></script>
   <script type="text/javascript" src="tripeaks.js"></script>
 </head>
 <body>
@@ -12,6 +13,20 @@
 <div id="controls" class="tripeaks-controls">
   <button id="solve" class="tripeaks-controls-button" disabled>Solve</button>
   <p/>
+  <div id="solution-controls" class="tripeaks-solution-controls">
+    <input type="image" id="s-c-play" class="tripeaks-s-c-button"
+         src="images/media-play.png" alt="Play"/>
+    <input type="image" id="s-c-pause" class="tripeaks-s-c-button"
+         src="images/media-pause.png" alt="Pause"/>
+    <br/>
+    <input type="image" id="s-c-prev" class="tripeaks-s-c-button"
+         src="images/media-prev.png" alt="Previous"/>
+    <input type="image" id="s-c-next" class="tripeaks-s-c-button"
+         src="images/media-next.png" alt="Next"/>
+    <br/>
+    <input type="image" id="s-c-restart" class="tripeaks-s-c-button"
+         src="images/media-restart.png" alt="Restart"/>
+  </div>
   <button id="reset" class="tripeaks-controls-button">Reset</button>
   <p/>
   <button id="test" class="tripeaks-controls-button">Test</button>

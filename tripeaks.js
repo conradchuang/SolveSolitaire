@@ -9,7 +9,9 @@ const PyramidPositions = [
     [0, 6], [0, 7], [0, 8], [0, 9],
 ];
 var PyramidKeys = new Set();
+const StackSize = 24;
 var assigned_positions = 0;
+var player_controls = null;
 
 //=============================================================================
 // UI
@@ -78,7 +80,7 @@ function tripeaks_gen() {
     stack.style.marginTop = "1rem";
     let num_rows = 1;
     stack.style.height = (num_rows * CardHeight).toFixed(2) + CardHeightUnit;
-    add_card_stack(stack, 24, num_rows);
+    add_card_stack(stack, StackSize, num_rows);
     container.appendChild(stack);
     add_transition_card(container);
     return container;
@@ -195,8 +197,8 @@ function make_key(row, col) {
 
 function parse_key(key) {
     let parts = key.split("-");
-    let row = parseInt(key[0], 10);
-    let col = parseInt(key[1], 10);
+    let row = parseInt(parts[0], 10);
+    let col = parseInt(parts[1], 10);
     return [row, col];
 }
 
@@ -265,11 +267,11 @@ function solve() {
 
     function find_solution(pos, card, removable, stack,
                            played, history, seen, depth) {
-        console.log(depth + ": " + pos + " " + card +
-                    " (removable " + removable.length + ") " +
-                    "(stack " + stack.length + ")");
-        console.log(removable);
-        console.log(stack);
+        // console.log(depth + ": " + pos + " " + card +
+        //             " (removable " + removable.length + ") " +
+        //             "(stack " + stack.length + ")");
+        // console.log(removable);
+        // console.log(stack);
         // Recursively try removing cards until we have none left
         let fp = fingerprint(card, stack.length, removable);
         if (fp in seen)
@@ -311,8 +313,7 @@ function solve() {
     // Build data structures
     let tripeaks = document.getElementById("tripeaks");
     let pyramid = {};
-    let NumStackCards = 24;
-    let stack = new Array(NumStackCards);
+    let stack = new Array(StackSize);
     let removable = [];     // Removable must be an array for fingerprint
     for (let img of tripeaks.querySelectorAll("img")) {
         let rank = img.getAttribute("data-rank");
@@ -322,7 +323,7 @@ function solve() {
             // Must be in stack
             let index = parseInt(img.getAttribute("data-index"), 10);
             // console.log("index " + index);
-            stack[NumStackCards - 1 - index] = rank;
+            stack[StackSize - 1 - index] = rank;
         } else {
             // Must be in pyramid
             let col = parseInt(img.getAttribute("data-col"), 10);
@@ -343,7 +344,12 @@ function solve() {
     let seen = new Set();
     let moves = find_solution(null, stack[0], removable, stack.slice(1),
                               played, history, seen, 1);
-    console.log(moves);
+    // console.log(moves);
+    if (!moves) {
+        alert("No solution found.");
+        return;
+    }
+    player_controls.set_controller(Solution(moves));
 }
 
 function reset() {
@@ -355,6 +361,7 @@ function reset() {
     cards.innerHTML = "";
     cards.appendChild(cards_table_gen());
     document.getElementById("solve").disabled = assigned_positions != 52;
+    player_controls.set_controller(null);
 }
 
 function _solve_handler(ev) {
@@ -366,11 +373,16 @@ function _reset_handler(ev) {
 }
 
 async function _test_handler(ev) {
-    // test_fill();
-    await test_move();
+    test_fill();
+    // await test_move();
 }
 
 function init() {
+    player_controls = PlayerControls({prev:"s-c-prev",
+                                      next:"s-c-next",
+                                      play:"s-c-play",
+                                      pause:"s-c-pause",
+                                      restart:"s-c-restart"});
     for (let rc of PyramidPositions) {
         // rc = row-column
         PyramidKeys.add(make_key(rc[0], rc[1]));
@@ -385,7 +397,104 @@ function init() {
 window.addEventListener("load", init);
 
 //=============================================================================
-// Transition code
+// Code for interacting with player controls
+// (player as in media player, not user)
+//=============================================================================
+
+function Solution(move_list) {
+    var moves = move_list;
+    var move_position = 0;
+    var stack_position = StackSize - 1;
+    var waste_src = [];
+
+    function get_state() {
+        return {
+            has_prev: move_position > 0,
+            has_next: move_position < moves.length
+        }
+    }
+
+    async function forward() {
+        // console.log("forward");
+        // console.log(moves[move_position]);
+        let move = moves[move_position];
+        let tripeaks = document.getElementById("tripeaks");
+        let waste = document.getElementById("tripeaks-waste");
+        let img = document.getElementById("tripeaks-card-transition");
+        let p = null;
+        if (move[0] == null) {
+            // console.log("move from stack");
+            let query = "img[data-index='" + stack_position + "']";
+            let imgs = tripeaks.querySelectorAll(query);
+            waste_src.push(imgs[0].src);
+            stack_position--;
+            p = move_card(img, imgs[0], "", waste);
+        } else {
+            // console.log("move from pyramid");
+            let rc = parse_key(move[0]);
+            let row = rc[0];
+            let col = rc[1];
+            let query = "img[data-col='" + col + "'][data-row='" + row + "']";
+            let imgs = tripeaks.querySelectorAll(query);
+            waste_src.push(imgs[0].src);
+            p = move_card(img, imgs[0], "", waste);
+        }
+        move_position++;
+        return p;
+    }
+
+    async function backward() {
+        move_position--;
+        let move = moves[move_position];
+        let tripeaks = document.getElementById("tripeaks");
+        let waste = document.getElementById("tripeaks-waste");
+        let img = document.getElementById("tripeaks-card-transition");
+        let p = null;
+        if (move[0] == null) {
+            // console.log("move to stack");
+            stack_position++;
+            let query = "img[data-index='" + stack_position + "']";
+            let imgs = tripeaks.querySelectorAll(query);
+            waste_src.pop();
+            let end = waste_src.length == 0 ? card_joker_url()
+                                            : waste_src[waste_src.length - 1];
+            p = move_card(img, waste, end, imgs[0]);
+        } else {
+            // console.log("move to pyramid");
+            let rc = parse_key(move[0]);
+            let row = rc[0];
+            let col = rc[1];
+            let query = "img[data-col='" + col + "'][data-row='" + row + "']";
+            let imgs = tripeaks.querySelectorAll(query);
+            // Knowing that the first card played is always off the stack,
+            // we assume that there is a card on the waste pile when
+            // moving a card back to the pyramid
+            waste_src.pop();
+            let end = waste_src[waste_src.length - 1];
+            p = move_card(img, waste, end, imgs[0]);
+        }
+        // console.log("backward");
+        // console.log(moves[move_position]);
+        return p;
+    }
+
+    async function restart() {
+        while (move_position > 0)
+            await backward();
+        move_position = 0;
+    }
+
+    return {
+        play_interval: 2000,        // interval between moves while playing
+        get_state: get_state,
+        forward: forward,
+        backward: backward,
+        restart: restart,
+    };
+}
+
+//=============================================================================
+// Card transition code
 //=============================================================================
 
 async function move_card(img, src_img, end_img_url, dst_img) {
@@ -401,10 +510,9 @@ async function move_card(img, src_img, end_img_url, dst_img) {
         // console.log(img);
         function end_transition(event) {
             // this == img
-            console.log("end transition");
+            // console.log("end transition");
             dst_img.src = img.src;
             img.style.display = "none";
-            // TODO More here
             resolve();
         }
         img.addEventListener("transitionend", end_transition, {once:true});
@@ -415,7 +523,7 @@ async function move_card(img, src_img, end_img_url, dst_img) {
         img.style.left = coord.left + "px";
         img.style.top = coord.top + "px";
         img.style.transitionProperty = "all";
-        img.style.transitionDuration = "1s";
+        img.style.transitionDuration = "0.5s";
         // console.log(img);
     });
 }
@@ -510,7 +618,6 @@ async function test_move() {
     let tripeaks = document.getElementById("tripeaks");
     let imgs = tripeaks.querySelectorAll(query);
     let src = imgs[0];
-    // let end = card_joker_url();
     let end = "";
     let dst = document.getElementById("tripeaks-waste");
     await move_card(img, src, end, dst);
