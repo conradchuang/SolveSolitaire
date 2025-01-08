@@ -1,7 +1,8 @@
-.cards-table {
+.cards-div {
     width: 100%;
+    position: relative;
 }
-.cards-row {
-}
-.cards-cell {
+.cards-position {
+    position: absolute;
+    transform: translateX(-50%);
 }

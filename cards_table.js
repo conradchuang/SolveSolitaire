@@ -35,33 +35,58 @@ function _card_key(rank, suit) {
     return suit + "-" + rank;
 }
 
+function _add_row(table) {
+    let row = document.createElement("tr");
+    row.className = "cards-row";
+    table.appendChild(row);
+    return row;
+}
+
+function _add_suit(div, row, offset, half_width, suit) {
+    let top = (CardHeight * 1.25 * row).toFixed(2) + CardHeightUnit;
+    for (let ri = 0; ri < Ranks.length; ri++) {
+        let img = document.createElement("img");
+        img.classList.add("cards-position");
+        img.classList.add("card-img");
+        let left = (offset + ri) * half_width;
+        img.style.left = (left * 100).toFixed(2) + "%";
+        img.style.top = top;
+        img.draggable = true;
+        let rank = Ranks[ri];
+        img.src = card_img_url(rank, suit);
+        img.setAttribute("data-rank", rank)
+        img.setAttribute("data-suit", suit)
+        img.setAttribute("data-used", "")
+        img.addEventListener("dragstart", _dragstart_handler);
+        _card_map[_card_key(rank, suit)] = img;
+        div.appendChild(img);
+    }
+}
+
 function cards_table_gen() {
     _card_map = {}
-    let table = document.createElement("table");
-    table.className = "cards-table";
-    for (let si = 0; si < Suits.length; si++) {
-        let row = document.createElement("tr");
-        row.className = "cards-row";
-        table.appendChild(row);
-        let suit = Suits[si];
-        for (let ri = 0; ri < Ranks.length; ri++) {
-            let cell = document.createElement("td");
-            cell.className = "cards-cell";
-            row.appendChild(cell);
-            let img = document.createElement("img");
-            img.className = "small-card-img";
-            // img.draggable = true;
-            let rank = Ranks[ri];
-            img.src = card_img_url(rank, suit);
-            img.setAttribute("data-rank", rank)
-            img.setAttribute("data-suit", suit)
-            img.setAttribute("data-used", "")
-            img.addEventListener("dragstart", _dragstart_handler);
-            _card_map[_card_key(rank, suit)] = img;
-            cell.appendChild(img);
-        }
-    }
-    return table;
+    let div = document.createElement("div");
+    div.style.height = (CardHeight * 2.25).toFixed(2) + CardHeightUnit;
+    // The half width of a card is computed by assuming that the
+    // cards (actually the full width occupied by a card including
+    // horizontal space on either side) overlap by 50%.
+    // So a single suit will have 1 card showing completely and
+    // 12 others showing half, for a total of 14 half cards.
+    // Since we want to put 2 suits per row, we also need to leave a
+    // half-card gap between the suits, yielding a total of 29 half cards.
+    // The cards are positioned at the center of their assigned
+    // space and css translates the card leftward by 50%.  So the
+    // first suit starts at offset 1 and its last card is at
+    // offset 13.  Offset 14 is the right half of the last card;
+    // offset 15 is the gap between suits.  So the second suit
+    // starts at offset 16.
+    let half_width = 1 / 29;    // As a fraction, not percent
+    div.className = "cards-div";
+    _add_suit(div, 0, 1, half_width, "spades");
+    _add_suit(div, 0, 16, half_width, "hearts");
+    _add_suit(div, 1, 1, half_width, "diamonds");
+    _add_suit(div, 1, 16, half_width, "clubs");
+    return div;
 }
 
 function card_img_url(rank, suit) {
