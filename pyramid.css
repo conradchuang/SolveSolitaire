@@ -1,0 +1,47 @@
+.pyramid-controls {
+    width: 10%;
+    float: right;
+    text-align: center;
+}
+.pyramid-controls-button {
+    width: 100%;
+}
+.pyramid-solution-controls {
+    border: 1px solid black;
+    border-radius: 1rem;
+    margin-bottom: 1rem;
+}
+.pyramid-s-c-button {
+    width: 1.5rem;
+    padding: 0.5rem;
+}
+.pyramid-s-c-button:disabled {
+    opacity: 0.5;
+}
+.pyramid-pyramid {
+    width: 85%;
+    background-image: url("images/background.jpg");
+    background-size: 100% 100%;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+.pyramid-cards-table {
+    width: 85%;
+    background-color: lightgray;
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+.pyramid-div {
+    position: relative;
+}
+.pyramid-waste {
+    float: right;
+    margin-left: 1rem;
+}
+.pyramid-card {
+    position: absolute;
+}
+.pyramid-center {
+    transform: translateX(-50%);
+}
