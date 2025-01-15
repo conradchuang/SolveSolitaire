@@ -1,9 +1,10 @@
 // vim: set ai et sw=4 sts=4:
 
-const CardHeight = 100;
-const CardHeightUnit = "px";
+const CardHeight = 6.5;
+const CardHeightUnit = "rem";
 const CardDir = "images";
 const CardJoker = "black_joker.png";
+const CardFoundation = "clear.png";
 const CardBack = "card back green.png";
 const Suits = ["spades", "hearts", "diamonds", "clubs"];
 const Ranks = ["ace", "king", "queen", "jack",
@@ -26,6 +27,7 @@ function _dragstart_handler(ev) {
         alert("Card is already used");
         return;
     }
+    ev.dataTransfer.effectAllowed = "move";
     ev.dataTransfer.dropEffect = "move";
     ev.dataTransfer.setData("rank", img.getAttribute("data-rank"));
     ev.dataTransfer.setData("suit", img.getAttribute("data-suit"));
@@ -99,6 +101,10 @@ function card_back_url() {
 
 function card_joker_url() {
     return CardDir + "/" + CardJoker;
+}
+
+function card_foundation_url() {
+    return CardDir + "/" + CardFoundation;
 }
 
 function card_used(rank, suit, used) {
