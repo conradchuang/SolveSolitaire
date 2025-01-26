@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Klondike Solver</title>
+  <meta charset="utf-8"/>
+  <link rel="stylesheet" href="cards_table.css"/>
+  <link rel="stylesheet" href="klondike.css"/>
+  <script type="text/javascript" src="cards_table.js"></script>
+  <script type="text/javascript" src="player_controls.js"></script>
+  <script type="text/javascript" src="klondike.js"></script>
+</head>
+<body>
+<h2>Klondike Solver</h2>
+<div id="controls" class="klondike-controls">
+  <button id="solve" class="klondike-controls-button" disabled>Solve</button>
+  <p/>
+  <div id="solution-controls" class="klondike-solution-controls">
+    <input type="image" id="s-c-play" class="klondike-s-c-button"
+         src="images/media-play.png" alt="Play"/>
+    <input type="image" id="s-c-pause" class="klondike-s-c-button"
+         src="images/media-pause.png" alt="Pause"/>
+    <br/>
+    <input type="image" id="s-c-prev" class="klondike-s-c-button"
+         src="images/media-prev.png" alt="Previous"/>
+    <input type="image" id="s-c-next" class="klondike-s-c-button"
+         src="images/media-next.png" alt="Next"/>
+    <br/>
+    <input type="image" id="s-c-restart" class="klondike-s-c-button"
+         src="images/media-restart.png" alt="Restart"/>
+  </div>
+  <button id="reset" class="klondike-controls-button">Reset</button>
+  <p/>
+  <button id="test" class="klondike-controls-button">Test</button>
+</div>
+<div id="klondike" class="klondike-board"></div>
+<div id="cards" class="klondike-cards-table"></div>
+</body>
+</html>

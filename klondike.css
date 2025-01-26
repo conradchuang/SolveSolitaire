@@ -1,0 +1,46 @@
+.klondike-controls {
+    width: 10%;
+    float: right;
+    text-align: center;
+}
+.klondike-controls-button {
+    width: 100%;
+}
+.klondike-solution-controls {
+    border: 1px solid black;
+    border-radius: 1rem;
+    margin-bottom: 1rem;
+}
+.klondike-s-c-button {
+    width: 1.5rem;
+    padding: 0.5rem;
+}
+.klondike-s-c-button:disabled {
+    opacity: 0.5;
+}
+.klondike-board {
+    width: 85%;
+    background-image: url("images/background.jpg");
+    background-size: 100% 100%;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+.klondike-cards-table {
+    width: 85%;
+    background-color: lightgray;
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+.klondike-div {
+    position: relative;
+}
+.klondike-foundation {
+    border: 1px dashed white;
+}
+.klondike-card {
+    position: absolute;
+}
+.klondike-center {
+    transform: translateX(-50%);
+}
