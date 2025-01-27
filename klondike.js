@@ -387,6 +387,9 @@ function unmake_card(suit, rank, row, col) {
 
 async function solve() {
 
+    let solution = null;
+    let max_depth = 0;
+
     // "foundation" contains the UI card img elements
     // "foundation_cards" contains the list of cards that are on
     //   that foundation (always same suit and in order A->K)
@@ -455,18 +458,25 @@ async function solve() {
         // We are looking for *any* solution, so we can
         // return immediately if we find one.
 
+        if (max_depth > 0 && depth >= max_depth)
+            return false;
+        // console.log(depth);
+
         // If all the cards are in foundations, we have a solution
         let played_count = 0;
         for (let suit in old_state.foundation_cards)
             played_count += old_state.foundation_cards[suit].length;
-        if (played_count == NumCards)
-            return history;
+        if (played_count == NumCards) {
+            solution = history.slice();
+            max_depth = depth;
+            alert("Found solution using " + solution.length + " steps");
+            return true;
+        }
 
         if (false) {
             // For debugging only
             if (depth == 3)
-                return null;
-            console.log("depth: " + depth);
+                return false;
             log_state(old_state);
         }
 
@@ -478,7 +488,7 @@ async function solve() {
         // console.log(fp);
         // console.log(seen.has(fp));
         if (seen.has(fp))
-            return null;
+            return false;
         seen.add(fp);
 
         // There are three types of moves that we can make:
@@ -488,11 +498,12 @@ async function solve() {
         // If none of these lead to a solution, we are at a dead end
 
         // console.log("find moves");
-        let moves = [];
-        move_to_foundation(moves, old_state);
-        shift_on_board(moves, old_state);
-        deal_from_stock(moves, old_state);
-        move_from_foundation(moves, old_state, history);
+        let moves = move_to_foundation(old_state);
+        let [p_moves, s_moves] = shift_on_board(old_state);
+        moves = moves.concat(p_moves);
+        moves = moves.concat(deal_from_stock(old_state));
+        moves = moves.concat(s_moves);
+        moves = moves.concat(move_from_foundation(old_state));
         // console.log(moves);
 
         // Try each move and see if we get a solution
@@ -502,20 +513,19 @@ async function solve() {
             // console.log(move);
             let state = move.apply_func(old_state, move, false);
             // console.log(state.fingerprint());
-            if (state) {
-                let solution = find_solution(state, history, seen, depth+1);
-                if (solution)
-                    return solution;
-            }
+            if (state)
+                if (find_solution(state, history, seen, depth + 1))
+                    return true;
             history.pop();
         }
 
-        return null;
+        return false;
     }
 
-    function move_to_foundation(moves, state, col, history) {
+    function move_to_foundation(state) {
         // Check if we can play "card" onto any columns
         // There should be 0, 1, or 2 possible moves
+        let moves = [];
         for (let col = 0; col < KlondikeNumCols; col++) {
             let column = state.board[col];
             if (column.length == 0)
@@ -537,6 +547,7 @@ async function solve() {
                          apply_func: apply_move_to_foundation,
                          col: col });
         }
+        return moves;
     }
 
     function apply_move_to_foundation(old_state, move, detailed) {
@@ -560,10 +571,14 @@ async function solve() {
                  max_height: column.length };
     }
 
-    function shift_on_board(moves, state, col, history) {
+    function shift_on_board(state) {
         // For each column, look at the top most cards and see
         // if they are consecutive, alternating-color sequences.
         // If so, see if they can be moved to another column.
+        // We keep track of possible moves for each column but
+        // do not put them on the move list yet.
+        let primary_moves = [];
+        let secondary_moves = [];
         for (let col = 0; col < KlondikeNumCols; col++) {
             let column = state.board[col];
             if (column.length == 0)
@@ -571,10 +586,19 @@ async function solve() {
                 continue;
             let row = column.length - 1;
             let card = column[row];
-            let was_red = card.is_red;
-            let prev_rank = card.rank;
-            while (true) {
-                // Try moving all cards from here to top of column
+            let can_move = true;
+            while (can_move) {
+                // Check if this is the last card in the column that
+                // we can move.  If this is the bottom-most card, we
+                // stop.  If the next card below is not one rank above
+                // or the same color, we stop.
+                can_move = row > 0;
+                if (can_move) {
+                    let next_card = column[row - 1];
+                    can_move = next_card.is_red != card.is_red &&
+                               next_card.rank == RankAbove[card.rank];
+                }
+                // Try moving all cards from here to top card of column
                 for (let tcol = 0; tcol < KlondikeNumCols; tcol++) {
                     if (tcol == col)
                         // Cannot move onto the same column
@@ -582,36 +606,36 @@ async function solve() {
                     let target_column = state.board[tcol];
                     if (target_column.length == 0) {
                         // Empty column.  Only kings can move here.
-                        if (prev_rank != "king")
+                        if (card.rank != "king")
+                            continue;
+                        // Do not move an entire column to another empty one.
+                        if (row == 0)
                             continue;
                     } else {
                         // Non-empty column.
                         let top_card = target_column[target_column.length - 1];
-                        if (top_card.rank != RankAbove[prev_rank])
+                        if (top_card.rank != RankAbove[card.rank])
                             continue;
-                        if (top_card.is_red == was_red)
+                        if (top_card.is_red == card.is_red)
                             continue;
                         // Okay to move onto this column
                     }
-                    moves.push({ type: "shift_on_board",
-                                apply_func: apply_shift_on_board,
-                                from_col: col,
-                                from_row: row,
-                                to_col: tcol });
+                    let move = { type: "shift_on_board",
+                                 apply_func: apply_shift_on_board,
+                                 from_col: col,
+                                 from_row: row,
+                                 to_col: tcol };
+                    if (can_move)
+                        secondary_moves.push(move);
+                    else
+                        primary_moves.push(move);
                 }
                 // Stop if next card does not continue sequence
-                row--;
-                if (row < 0)
-                    break;
-                card = column[row];
-                if (card.is_red == was_red)
-                    break;
-                if (card.rank != RankAbove[prev_rank])
-                    break;
-                was_red = card.is_red;
-                prev_rank = card.rank;
+                if (can_move)
+                    card = column[--row];
             }
         }
+        return [primary_moves, secondary_moves];
     }
 
     function apply_shift_on_board(old_state, move, detailed) {
@@ -639,13 +663,14 @@ async function solve() {
                  max_height: to_column.length };
     }
 
-    function deal_from_stock(moves, state, history) {
+    function deal_from_stock(state) {
+        let moves = [];
         let num_cards = Math.min(state.stock.length, KlondikeNumCols);
-        if (num_cards == 0)
-            return;
-        moves.push({ type: "deal_from_stock",
-                     apply_func: apply_deal_from_stock,
-                     num_cards: num_cards });
+        if (num_cards > 0)
+            moves.push({ type: "deal_from_stock",
+                         apply_func: apply_deal_from_stock,
+                         num_cards: num_cards });
+        return moves;
     }
 
     function apply_deal_from_stock(old_state, move, detailed) {
@@ -680,7 +705,8 @@ async function solve() {
                  max_height: max_height };
     }
 
-    function move_from_foundation(moves, state, history) {
+    function move_from_foundation(state) {
+        let moves = [];
         for (let suit in state.foundation_cards) {
             let played = state.foundation_cards[suit];
             if (played.length == 0)
@@ -710,6 +736,7 @@ async function solve() {
                              col: col });
             }
         }
+        return moves;
     }
 
     function apply_move_from_foundation(old_state, move, detailed) {
@@ -768,15 +795,14 @@ async function solve() {
 
         let history = [];
         let seen = new Set();
-        let moves = find_solution(init_state, history, seen, 0);
-        // console.log(moves);
-        if (!moves) {
+        find_solution(init_state, history, seen, 0);
+        // console.log(solution);
+        if (!solution) {
             alert("No solution found.");
             return;
         }
-        // console.log(moves);
-        controller = await Solution(init_state, moves)
-        console.log(controller);
+        // console.log(solution);
+        controller = await Solution(init_state, solution)
         player_controls.set_controller(controller);
     };
 
