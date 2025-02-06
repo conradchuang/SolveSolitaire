@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Spider Solver</title>
+  <meta charset="utf-8"/>
+  <link rel="stylesheet" href="cards_table.css"/>
+  <link rel="stylesheet" href="spider.css"/>
+  <script type="text/javascript" src="multideck.js"></script>
+  <script type="text/javascript" src="player_controls.js"></script>
+  <script type="text/javascript" src="spider.js"></script>
+</head>
+<body>
+<h2>Spider Solver</h2>
+<div id="controls" class="spider-controls">
+  <button id="solve" class="spider-controls-button" disabled>Solve</button>
+  <p/>
+  <div id="solution-controls" class="spider-solution-controls">
+    <input type="image" id="s-c-play" class="spider-s-c-button"
+         src="images/media-play.png" alt="Play"/>
+    <input type="image" id="s-c-pause" class="spider-s-c-button"
+         src="images/media-pause.png" alt="Pause"/>
+    <br/>
+    <input type="image" id="s-c-prev" class="spider-s-c-button"
+         src="images/media-prev.png" alt="Previous"/>
+    <input type="image" id="s-c-next" class="spider-s-c-button"
+         src="images/media-next.png" alt="Next"/>
+    <br/>
+    <input type="image" id="s-c-restart" class="spider-s-c-button"
+         src="images/media-restart.png" alt="Restart"/>
+  </div>
+  <button id="reset" class="spider-controls-button">Reset</button>
+  <p/>
+  <button id="test" class="spider-controls-button">Test</button>
+</div>
+<div id="spider" class="spider-board"></div>
+<div id="cards" class="spider-cards-table"></div>
+</body>
+</html>

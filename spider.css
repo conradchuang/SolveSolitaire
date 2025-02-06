@@ -1,0 +1,46 @@
+.spider-controls {
+    width: 10%;
+    float: right;
+    text-align: center;
+}
+.spider-controls-button {
+    width: 100%;
+}
+.spider-solution-controls {
+    border: 1px solid black;
+    border-radius: 1rem;
+    margin-bottom: 1rem;
+}
+.spider-s-c-button {
+    width: 1.5rem;
+    padding: 0.5rem;
+}
+.spider-s-c-button:disabled {
+    opacity: 0.5;
+}
+.spider-board {
+    width: 85%;
+    background-image: url("images/background.jpg");
+    background-size: 100% 100%;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+.spider-cards-table {
+    width: 85%;
+    background-color: lightgray;
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+.spider-div {
+    position: relative;
+}
+.spider-foundation {
+    border: 1px dashed white;
+}
+.spider-card {
+    position: absolute;
+}
+.spider-center {
+    transform: translateX(-50%);
+}
