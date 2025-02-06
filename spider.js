@@ -393,8 +393,15 @@ async function solve() {
             let fp = [];
             for (let col = 0; col < SpiderNumCols; col++)
                 fp.push(board[col].map(card => card.fingerprint).join(""))
+            // Sort the columns because order does not matter
+            // for finding a solution.  Stock cards do not need
+            // to be sorted since they should always be in the
+            // same order.  Waste pile cards do not be included
+            // because order they are whatever is not on the board
+            // or in the stock pile and order does not matter
+            fp.sort();
             fp.push(stock.map(card => card.fingerprint).join(""));
-            fp.push(waste.map(card => card.fingerprint).join(""));
+            // fp.push(waste.map(card => card.fingerprint).join(""));
             return fp.join("/");
         }
 
