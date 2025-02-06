@@ -605,6 +605,7 @@ async function solve() {
             // If we want the first solution, we return immediately.
             // Otherwise, we keep trying, but with max_depth set to
             // the smallest known solution size, so we limit the search.
+            // (Still takes forever to finish though.)
             if (true && found)
                 return true;
             // console.log("end " + depth + " " + move.type);
@@ -644,15 +645,19 @@ async function solve() {
             // can_move finds all the moves from column fcol to column tcol.
             // The moves are separated into primary and secondary moves.
             // Primary moves are those that should be tried before dealing
-            // from stack.  Secondary moves are those that should be tried
-            // after.  Assumes that fcol != tcol.
+            // from stack.  Secondary and tertiary moves are those that
+            // should be tried after.  Tertiary moves are those that move
+            // part of a stack onto another of the same suit; they leave
+            // the top card the same in both columns, so are less interesting.
+            // Assumes that fcol != tcol.
             // console.log("can move: " + col + ", " + row + " => " + tcol);
             let primary = [];
             let secondary = [];
+            let tertiary = [];
             let fstack = stacks[fcol];
             if (fstack.length == 0) {
                 // If "from" column is empty, there are no moves available.
-                return [primary, secondary];
+                return [primary, secondary, tertiary];
             }
             let tstack = stacks[tcol];
             let fc = state.board[fcol];
@@ -706,21 +711,24 @@ async function solve() {
                     // - We are moving part of the stack to a new column.
                     //   This can be useful if we are creating a larger
                     //   stack in the new column, which we can explore
-                    //   now; otherwise, we explore later.
+                    //   now; otherwise, we explore later (after moving
+                    //   entire stacks onto different suits).
                     if (fcard.suit != tcard.suit) {
                         if (row == fstack.row)
                             secondary.push(move);
                     } else {
                         let moving = fc.length - row;
                         if (moving + tstack.length > fstack.length)
+                        // if (row == fstack.row)
                             primary.push(move);
                         else
-                            secondary.push(move);
+                        //    secondary.push(move);
+                            tertiary.push(move);
                     }
                     break;
                 }
             }
-            return [primary, secondary];
+            return [primary, secondary, tertiary];
         }
 
         // First we find the stacks (consecutive cards of the same suit)
@@ -728,6 +736,7 @@ async function solve() {
         // a primary move to put the stack away.
         let primary_moves = [];
         let secondary_moves = [];
+        let tertiary_moves = [];
         let stacks = [];
         for (let col = 0; col < SpiderNumCols; col++) {
             let stack = top_stack(col);
@@ -745,11 +754,15 @@ async function solve() {
             for (let tcol = 0; tcol < SpiderNumCols; tcol++) {
                 if (fcol == tcol)
                     continue;
-                let [p_moves, s_moves] = can_move(stacks, fcol, tcol);
+                let [p_moves, s_moves, t_moves] = can_move(stacks, fcol, tcol);
                 primary_moves.push(...p_moves);
                 secondary_moves.push(...s_moves);
+                tertiary_moves.push(...t_moves);
             }
         }
+        // combine secondary and tertiary moves since they will all
+        // be tried after dealing from stock.
+        secondary_moves.push(...tertiary_moves);
         return [primary_moves, secondary_moves];
     }
 
