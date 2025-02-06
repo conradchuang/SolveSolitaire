@@ -105,7 +105,6 @@ function _click_handler(ev) {
 }
 
 function klondike_gen() {
-    // The cards are arranged in rows.
     // Vertically, the game is divided into three sections:
     // the four foundations, the board, and the stock pile.
     // The sections are separate by "section_gap" card-heights;
@@ -118,12 +117,12 @@ function klondike_gen() {
     // and are separated by "col_gap" card-width.  Cards in each column
     // overlaps by "card_overlap" card-height.  While the initial board
     // has at most (number of columns) cards, during play, there will
-    // be more cards per column.  A priori, we allocate twice as many
-    // cards per column as initial, but that can be adjusted later
+    // be more cards per column.  A priori, we allocate space for
+    // twice as many cards per column, but that can be adjusted later
     // when the maximum number of cards in a column for an actual
     // solution is found.
     //
-    // For the stock pile, there are KlondikeStockSize cards.  The
+    // For the stock pile, there are StockSize cards.  The
     // available space is evenly divided for the cards, so the
     // any overlap is the result of insufficient space to show
     // the full width of the cards.
@@ -491,15 +490,22 @@ async function solve() {
             return false;
         seen.add(fp);
 
-        // There are three types of moves that we can make:
+        // There are different types of moves that we can make:
         // - move card to foundation
         // - shift card(s) from one column to another
         // - deal from stock
+        // - move card from foundation
         // If none of these lead to a solution, we are at a dead end
 
         // console.log("find moves");
         let moves = move_to_foundation(old_state);
         let [p_moves, s_moves] = shift_on_board(old_state);
+        // Shifting cards from one column to another is divided into
+        // "primary" moves where all consecutive cards at the top of
+        // the column are moved, and "secondary" moves where some of
+        // the consecutive cards are left in the original column.
+        // We try the primary moves first, but only try secondary
+        // moves if dealing from stock does not yield a solution.
         moves = moves.concat(p_moves);
         moves = moves.concat(deal_from_stock(old_state));
         moves = moves.concat(s_moves);
