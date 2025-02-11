@@ -6,3 +6,6 @@
     position: absolute;
     transform: translateX(-50%);
 }
+.cards-well {
+    border: 1px dashed white;
+}

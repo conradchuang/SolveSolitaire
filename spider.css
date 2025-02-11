@@ -35,9 +35,6 @@
 .spider-div {
     position: relative;
 }
-.spider-foundation {
-    border: 1px dashed white;
-}
 .spider-card {
     position: absolute;
 }

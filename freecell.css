@@ -35,9 +35,6 @@
 .freecell-div {
     position: relative;
 }
-.freecell-foundation {
-    border: 1px dashed white;
-}
 .freecell-card {
     position: absolute;
 }

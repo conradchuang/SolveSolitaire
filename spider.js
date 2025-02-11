@@ -269,15 +269,15 @@ function add_stock(div, num_cards, num_rows, row_gap,
     img.setAttribute("data-suit", "");
     img.setAttribute("data-key", "");
     img.classList.add("card-img");
+    img.classList.add("cards-well");
     img.classList.add("spider-card");
     img.classList.add("spider-center");
-    img.classList.add("spider-foundation");
     let left = card_width * (cards_per_row + 3);
     img.style.left = percent(left);
     // Place waste pile in vertical middle
     let yoffset = section_height / 2 - CardHeight / 2;
     img.style.top = height_unit(section_top + yoffset);
-    img.src = card_foundation_url();
+    img.src = card_well_url();
     img.addEventListener("click", _click_handler);
     img.addEventListener("drop", _drop_handler);
     img.addEventListener("dragenter", _cancel_handler);

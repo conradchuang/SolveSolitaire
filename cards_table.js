@@ -3,8 +3,7 @@
 const CardHeight = 6.5;
 const CardHeightUnit = "rem";
 const CardDir = "images";
-const CardJoker = "black_joker.png";
-const CardFoundation = "clear.png";
+const CardWell = "clear.png";
 const CardBack = "card back green.png";
 const Suits = ["spades", "hearts", "diamonds", "clubs"];
 const Ranks = ["ace", "king", "queen", "jack",
@@ -99,12 +98,8 @@ function card_back_url() {
     return CardDir + "/" + CardBack;
 }
 
-function card_joker_url() {
-    return CardDir + "/" + CardJoker;
-}
-
-function card_foundation_url() {
-    return CardDir + "/" + CardFoundation;
+function card_well_url() {
+    return CardDir + "/" + CardWell;
 }
 
 function card_used(rank, suit, used) {

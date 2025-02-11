@@ -168,13 +168,14 @@ function add_card_stack(div, num_cards, num_rows) {
     let img = document.createElement("img");
     img.id = "pyramid-waste";
     img.classList.add("card-img");
+    img.classList.add("cards-well");
     img.classList.add("pyramid-card");
     img.classList.add("pyramid-center");
     waste_card = img;
     let left = card_width * (cards_per_row + 3);
     img.style.left = (left * 100).toFixed(2) + "%";
     img.style.top = (CardHeight * (num_rows-1)/2).toFixed(2) + CardHeightUnit;
-    img.src = card_joker_url();
+    img.src = card_well_url();
     div.appendChild(img);
 }
 
@@ -455,7 +456,7 @@ function Solution(move_list) {
             stack_position++;
             let img = find_stack_card(stack_position);
             waste_src.pop();
-            let end = waste_src.length == 0 ? card_joker_url()
+            let end = waste_src.length == 0 ? card_well_url()
                                             : waste_src[waste_src.length - 1];
             p = move_card(waste_card, end, img);
         } else {

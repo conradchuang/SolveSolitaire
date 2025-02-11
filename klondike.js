@@ -195,13 +195,13 @@ function add_foundation(div) {
         img.setAttribute("data-rank", "");
         img.setAttribute("data-suit", SuitOrder[i]);
         img.classList.add("card-img");
+        img.classList.add("cards-well");
         img.classList.add("klondike-card");
         img.classList.add("klondike-center");
-        img.classList.add("klondike-foundation");
         let left = offset + width * (i * 2 + 1);
         img.style.left = percent(left);
         img.style.top = "0px";
-        img.src = card_foundation_url();
+        img.src = card_well_url();
         div.appendChild(img);
     }
     layout.foundation_offset = offset;

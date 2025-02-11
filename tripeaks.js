@@ -167,12 +167,13 @@ function add_card_stack(div, num_cards, num_rows) {
     let img = document.createElement("img");
     img.id = "tripeaks-waste";
     img.classList.add("card-img");
+    img.classList.add("cards-well");
     img.classList.add("tripeaks-card");
     img.classList.add("tripeaks-center");
     let left = card_width * (cards_per_row + 3);
     img.style.left = (left * 100).toFixed(2) + "%";
     img.style.top = (CardHeight * (num_rows-1)/2).toFixed(2) + CardHeightUnit;
-    img.src = card_joker_url();
+    img.src = card_well_url();
     div.appendChild(img);
 }
 
@@ -456,7 +457,7 @@ function Solution(move_list) {
             let query = "img[data-index='" + stack_position + "']";
             let imgs = tripeaks.querySelectorAll(query);
             waste_src.pop();
-            let end = waste_src.length == 0 ? card_joker_url()
+            let end = waste_src.length == 0 ? card_well_url()
                                             : waste_src[waste_src.length - 1];
             p = move_card(img, waste, end, imgs[0]);
         } else {

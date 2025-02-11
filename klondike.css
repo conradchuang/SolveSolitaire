@@ -35,9 +35,6 @@
 .klondike-div {
     position: relative;
 }
-.klondike-foundation {
-    border: 1px dashed white;
-}
 .klondike-card {
     position: absolute;
 }

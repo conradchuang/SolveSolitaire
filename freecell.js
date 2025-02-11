@@ -253,13 +253,13 @@ function add_cells_and_foundations(div, cell_gap, foundation_gap,
         img.setAttribute("data-suit", "");
         img.setAttribute("data-key", "");
         img.classList.add("card-img");
+        img.classList.add("cards-well");
         img.classList.add("freecell-card");
         img.classList.add("freecell-center");
-        img.classList.add("freecell-foundation");
         let left = unit * ((1 + cell_gap) * c + 0.5);
         img.style.left = percent(left);
         img.style.top = height_unit(section_top);
-        img.src = card_foundation_url();
+        img.src = card_well_url();
         div.appendChild(img);
         freecell_imgs.push(img);
     }
@@ -276,13 +276,13 @@ function add_cells_and_foundations(div, cell_gap, foundation_gap,
         img.setAttribute("data-suit", "");
         img.setAttribute("data-key", "");
         img.classList.add("card-img");
+        img.classList.add("cards-well");
         img.classList.add("freecell-card");
         img.classList.add("freecell-center");
-        img.classList.add("freecell-foundation");
         let left = xoffset + unit * ((1 + foundation_gap) * f + 0.5);
         img.style.left = percent(left);
         img.style.top = height_unit(section_top);
-        img.src = card_foundation_url();
+        img.src = card_well_url();
         div.appendChild(img);
         foundation_imgs.push(img);
     }
