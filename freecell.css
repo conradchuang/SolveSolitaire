@@ -1,0 +1,46 @@
+.freecell-controls {
+    width: 10%;
+    float: right;
+    text-align: center;
+}
+.freecell-controls-button {
+    width: 100%;
+}
+.freecell-solution-controls {
+    border: 1px solid black;
+    border-radius: 1rem;
+    margin-bottom: 1rem;
+}
+.freecell-s-c-button {
+    width: 1.5rem;
+    padding: 0.5rem;
+}
+.freecell-s-c-button:disabled {
+    opacity: 0.5;
+}
+.freecell-board {
+    width: 85%;
+    background-image: url("images/background.jpg");
+    background-size: 100% 100%;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+.freecell-cards-table {
+    width: 85%;
+    background-color: lightgray;
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+.freecell-div {
+    position: relative;
+}
+.freecell-foundation {
+    border: 1px dashed white;
+}
+.freecell-card {
+    position: absolute;
+}
+.freecell-center {
+    transform: translateX(-50%);
+}

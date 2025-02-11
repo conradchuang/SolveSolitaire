@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>FreeCell Solver</title>
+  <meta charset="utf-8"/>
+  <link rel="stylesheet" href="cards_table.css"/>
+  <link rel="stylesheet" href="freecell.css"/>
+  <script type="text/javascript" src="multideck.js"></script>
+  <script type="text/javascript" src="player_controls.js"></script>
+  <script type="text/javascript" src="freecell.js"></script>
+</head>
+<body>
+<h2>FreeCell Solver</h2>
+<div id="controls" class="freecell-controls">
+  <button id="solve" class="freecell-controls-button" disabled>Solve</button>
+  <p/>
+  <div id="solution-controls" class="freecell-solution-controls">
+    <input type="image" id="s-c-play" class="freecell-s-c-button"
+         src="images/media-play.png" alt="Play"/>
+    <input type="image" id="s-c-pause" class="freecell-s-c-button"
+         src="images/media-pause.png" alt="Pause"/>
+    <br/>
+    <input type="image" id="s-c-prev" class="freecell-s-c-button"
+         src="images/media-prev.png" alt="Previous"/>
+    <input type="image" id="s-c-next" class="freecell-s-c-button"
+         src="images/media-next.png" alt="Next"/>
+    <br/>
+    <input type="image" id="s-c-restart" class="freecell-s-c-button"
+         src="images/media-restart.png" alt="Restart"/>
+  </div>
+  <button id="reset" class="freecell-controls-button">Reset</button>
+  <p/>
+  <button id="test" class="freecell-controls-button">Test</button>
+</div>
+<div id="freecell" class="freecell-board"></div>
+<div id="cards" class="freecell-cards-table"></div>
+</body>
+</html>
