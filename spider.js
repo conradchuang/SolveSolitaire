@@ -369,6 +369,8 @@ function init() {
     document.getElementById("test").addEventListener("click", _test_handler);
 }
 
+window.addEventListener("load", init);
+
 //=============================================================================
 // Solver
 //=============================================================================
@@ -379,82 +381,357 @@ function suit_rank_fp(suit, rank) {
     return InvSuitMap[suit] + InvRankMap[rank];
 }
 
+function make_card(suit, rank, key, row, col, img) {
+    // Note that the key and fingerprint are different.  For fingerprint,
+    // identical rank+suit cards are interchangeable, but for uniqueness,
+    // they are not.
+    let card = { suit: suit,
+                 rank: rank,
+                 key: key,
+                 row: row,
+                 col: col,
+                 is_red: suit === "hearts" || suit === "diamonds",
+                 img: img,
+                 fingerprint: suit_rank_fp(suit, rank),
+                 left: img.style.left,
+                 top: img.style.top };
+    return card;
+}
+
+function make_state(waste, board, stock) {
+
+    function fingerprint() {
+        // To uniquely identify the state, we construct
+        // a string that is the concatenation of the column
+        // cards, the stock pile cards, and the waste pile cards
+        let fp = [];
+        for (let col = 0; col < SpiderNumCols; col++)
+            fp.push(board[col].map(card => card.fingerprint).join(""))
+        // Sort the columns because order does not matter
+        // for finding a solution.  Stock cards do not need
+        // to be sorted since they should always be in the
+        // same order.  Waste pile cards do not be included
+        // because order they are whatever is not on the board
+        // or in the stock pile and order does not matter
+        fp.sort();
+        fp.push(stock.map(card => card.fingerprint).join(""));
+        // fp.push(waste.map(card => card.fingerprint).join(""));
+        return fp.join("/");
+    }
+
+    function copy() {
+        // Make a copy of the board state without copying
+        // the playing state variables
+        // "board" needs to be copied per column (array)
+        // "stock" needs to be copied (array)
+        // "waste" needs to be copied (array)
+        // The array copying can be shallow since the array elements are
+        // cards, whose properties never change.
+        let new_w = waste.slice();
+        let new_b = new Array(board.length);
+        for (let i = 0; i < new_b.length; i++)
+            new_b[i] = board[i].slice();
+        let new_s = stock.slice();
+        return make_state(new_w, new_b, new_s);
+    }
+
+    function log() {
+        console.log(this);
+        function c2fp(card) { return card.fingerprint; }
+        for (let col = 0; col < SpiderNumCols; col++) {
+            let cards = board[col];
+            console.log("column " + col + ": " + cards.map(c2fp).join(" "));
+        }
+        console.log("stock: " + stock.map(c2fp).join(" "));
+        console.log("waste: " + waste.map(c2fp).join(" "));
+    }
+
+    return { board: board,
+             stock: stock,
+             waste: waste,
+             copy: copy,
+             log: log,
+             fingerprint: fingerprint }
+}
+
+function board_to_board(state) {
+
+    function top_stack(col) {
+        let column = state.board[col];
+        if (column.length == 0)
+            return { col: col,
+                     row: -1,
+                     length: 0,
+                     card: null };
+        let row = column.length - 1;
+        let card = column[row];
+        while (row > 0) {
+            next_card = column[row - 1];
+            if (next_card.suit != card.suit ||
+                next_card.rank != RankAbove[card.rank])
+                    break;
+            row--;
+            card = next_card;
+        }
+        return { length: column.length - row,
+                 col: col,
+                 row: row,
+                 card: card };
+    }
+
+    function can_move(stacks, fcol, tcol) {
+        // can_move finds all the moves from column fcol to column tcol.
+        // The moves are separated into primary and secondary moves.
+        // Primary moves are those that should be tried before dealing
+        // from stack.  Secondary and tertiary moves are those that
+        // should be tried after.  Tertiary moves are those that move
+        // part of a stack onto another of the same suit; they leave
+        // the top card the same in both columns, so are less interesting.
+        // Assumes that fcol != tcol.
+        // console.log("can move: " + col + ", " + row + " => " + tcol);
+        let primary = [];
+        let secondary = [];
+        let tertiary = [];
+        let fstack = stacks[fcol];
+        if (fstack.length == 0) {
+            // If "from" column is empty, there are no moves available.
+            return [primary, secondary, tertiary];
+        }
+        let tstack = stacks[tcol];
+        let fc = state.board[fcol];
+        let tc = state.board[tcol];
+        if (tc.length == 0) {
+            // If the "to" column is empty, we try to move different
+            // number of cards from the column.  The only move we
+            // do not attempt is to move all of the "from" column
+            // (starting with row 0) to the "to" column since that
+            // cannot help find a solution.
+            let row = fstack.row;
+            if (row != 0) {
+                let move = { type: "board_to_board",
+                             card: fc[row],
+                             apply_func: apply_board_to_board,
+                             from_col: fcol,
+                             from_row: row,
+                             to_col: tcol };
+                primary.push(move);
+            }
+            while (++row < fc.length) {
+                let move = { type: "board_to_board",
+                             card: fc[row],
+                             apply_func: apply_board_to_board,
+                             from_col: fcol,
+                             from_row: row,
+                             to_col: tcol };
+                secondary.push(move);
+            }
+        } else {
+            let tcard = tc[tc.length - 1];
+            for (let row = fstack.row; row < fc.length; row++) {
+                let fcard = fc[row];
+                if (tcard.rank != RankAbove[fcard.rank])
+                    continue;
+                let move = { type: "board_to_board",
+                             card: fcard,
+                             apply_func: apply_board_to_board,
+                             from_col: fcol,
+                             from_row: row,
+                             to_col: tcol };
+                // There are three possibilities:
+                // - The destination column is a different suit than the
+                //   source stack.  This is a secondary move that we can
+                //   explore later (after dealing from stock).
+                //   Do not bother moving a partial stack over another
+                //   suit since that rarely results in a solution.
+                // - We are moving the entire stack to a new column.
+                //   We want to explore this first since it reveals
+                //   a new stack under the current one.
+                // - We are moving part of the stack to a new column.
+                //   This can be useful if we are creating a larger
+                //   stack in the new column, which we can explore
+                //   now; otherwise, we explore later (after moving
+                //   entire stacks onto different suits).
+                if (fcard.suit != tcard.suit) {
+                    if (row == fstack.row)
+                        secondary.push(move);
+                } else {
+                    let moving = fc.length - row;
+                    if (moving + tstack.length > fstack.length)
+                    // if (row == fstack.row)
+                        primary.push(move);
+                    else
+                    //    secondary.push(move);
+                        tertiary.push(move);
+                }
+                break;
+            }
+        }
+        return [primary, secondary, tertiary];
+    }
+
+    // First we find the stacks (consecutive cards of the same suit)
+    // for each column.  If any stack is complete (A->K), we create
+    // a primary move to put the stack away.
+    let primary_moves = [];
+    let secondary_moves = [];
+    let tertiary_moves = [];
+    let stacks = [];
+    for (let col = 0; col < SpiderNumCols; col++) {
+        let stack = top_stack(col);
+        stacks[col] = stack;
+        if (stack.length >= 13) {
+            // console.log("found full stack: " + stack.length);
+            primary_moves.push({ type: "board_to_waste",
+                                 card: null,
+                                 apply_func: apply_board_to_waste,
+                                 col: col });
+        }
+    }
+
+    for (let fcol = 0; fcol < SpiderNumCols; fcol++) {
+        for (let tcol = 0; tcol < SpiderNumCols; tcol++) {
+            if (fcol == tcol)
+                continue;
+            let [p_moves, s_moves, t_moves] = can_move(stacks, fcol, tcol);
+            primary_moves.push(...p_moves);
+            secondary_moves.push(...s_moves);
+            tertiary_moves.push(...t_moves);
+        }
+    }
+    // combine secondary and tertiary moves since they will all
+    // be tried after dealing from stock.
+    secondary_moves.push(...tertiary_moves);
+    return [primary_moves, secondary_moves];
+}
+
+function apply_board_to_board(old_state, move, detailed) {
+    let state = old_state.copy();
+    let from_column = state.board[move.from_col];
+    let to_column = state.board[move.to_col];
+    let cards = from_column.splice(move.from_row);
+    to_column.push(...cards);
+    if (!detailed)
+        return state;
+    let moved = [];
+    for (let i = 0; i < cards.length; i++) {
+        let s_row = from_column.length + i;
+        let d_row = to_column.length - cards.length + i;
+        moved.push({ card: cards[i],
+                     src_col: move.from_col,
+                     src_row: s_row,
+                     src_z: s_row,
+                     dst_col: move.to_col,
+                     dst_row: d_row,
+                     dst_z: d_row });
+    }
+    return { state: state,
+             moved: moved,
+             max_height: to_column.length };
+}
+
+function apply_board_to_waste(old_state, move, detailed) {
+    let state = old_state.copy();
+    let column = state.board[move.col];
+    let cards = column.splice(column.length - 13);
+    state.waste.push(...cards);
+    if (!detailed)
+        return state;
+    let moved = [];
+    for (let i = 0; i < cards.length; i++) {
+        let s_row = column.length + i;
+        let d_row = state.waste.length - cards.length + i;
+        moved.push({ card: cards[i],
+                     src_col: move.col,
+                     src_row: s_row,
+                     src_z: s_row,
+                     dst_col: 0,
+                     dst_row: WasteRow,
+                     dst_z: d_row });
+    }
+    return { state: state,
+             moved: moved,
+             max_height: column.length };
+}
+
+function stock_to_board(state) {
+    let moves = [];
+    let num_cards = Math.min(state.stock.length, SpiderNumCols);
+    if (num_cards > 0)
+        moves.push({ type: "stock_to_board",
+                     card: null,
+                     apply_func: apply_stock_to_board,
+                     num_cards: num_cards });
+    return moves;
+}
+
+function apply_stock_to_board(old_state, move, detailed) {
+    let state = old_state.copy();
+    let cards = state.stock.splice(state.stock.length - move.num_cards);
+    for (let i = 0; i < cards.length; i++) {
+        let n = cards.length - i - 1;
+        let column = state.board[i];
+        column.push(cards[n]);
+    }
+    if (!detailed)
+        return state;
+    let moved = [];
+    let max_height = 0;
+    for (let i = 0; i < cards.length; i++) {
+        let n = cards.length - i - 1;
+        let s_col = state.stock.length + i;
+        let d_row = state.board[i].length - 1;
+        moved.push({ card: cards[n],
+                     src_col: s_col,
+                     src_row: StockRow,
+                     src_z: s_col,
+                     dst_col: i,
+                     dst_row: d_row,
+                     dst_z: d_row });
+        let height = state.board[i].length;
+        if (height > max_height)
+            max_height = height;
+    }
+    return { state: state,
+             moved: moved,
+             max_height: max_height };
+}
+
+async function make_init_state() {
+    // Code wrapped in function so that local variables do not leak
+    // to other functions.
+
+    // Build data structures
+    let waste = [];
+    let stock = [];
+    let board = [];
+    for (let col = 0; col < SpiderNumCols; col++)
+        board[col] = [];
+    for (let img of spider_div.querySelectorAll("img")) {
+        let col = parseInt(img.getAttribute("data-col"), 10);
+        let row = parseInt(img.getAttribute("data-row"), 10);
+        let suit = img.getAttribute("data-suit");
+        let rank = img.getAttribute("data-rank");
+        let key = img.getAttribute("data-key");
+        let card = make_card(suit, rank, key, row, col, img);
+        if (row == StockRow)
+            stock[col] = card;
+        else if (row != WasteRow)
+            board[col][row] = card;
+    }
+    // console.log("initialized");
+    // console.log(waste);
+    // console.log(board);
+    // console.log(stock);
+    let init_state = make_state(waste, board, stock);
+    // console.log(init_state);
+    // console.log("fingerprint: " + init_state.fingerprint());
+    return init_state;
+}
+
 async function solve() {
 
     let solution = null;
     let max_depth = 1000;
-
-    function make_state(waste, board, stock) {
-
-        function fingerprint() {
-            // To uniquely identify the state, we construct
-            // a string that is the concatenation of the column
-            // cards, the stock pile cards, and the waste pile cards
-            let fp = [];
-            for (let col = 0; col < SpiderNumCols; col++)
-                fp.push(board[col].map(card => card.fingerprint).join(""))
-            // Sort the columns because order does not matter
-            // for finding a solution.  Stock cards do not need
-            // to be sorted since they should always be in the
-            // same order.  Waste pile cards do not be included
-            // because order they are whatever is not on the board
-            // or in the stock pile and order does not matter
-            fp.sort();
-            fp.push(stock.map(card => card.fingerprint).join(""));
-            // fp.push(waste.map(card => card.fingerprint).join(""));
-            return fp.join("/");
-        }
-
-        function copy() {
-            // Make a copy of the board state without copying
-            // the playing state variables
-            // "board" needs to be copied per column (array)
-            // "stock" needs to be copied (array)
-            // "waste" needs to be copied (array)
-            // The array copying can be shallow since the array elements are
-            // cards, whose properties never change.
-            let new_w = waste.slice();
-            let new_b = new Array(board.length);
-            for (let i = 0; i < new_b.length; i++)
-                new_b[i] = board[i].slice();
-            let new_s = stock.slice();
-            return make_state(new_w, new_b, new_s);
-        }
-
-        return { board: board,
-                 stock: stock,
-                 waste: waste,
-                 copy: copy,
-                 fingerprint: fingerprint }
-    }
-
-    function log_state(state) {
-        console.log(state);
-        function c2fp(card) { return card.fingerprint; }
-        for (let col = 0; col < SpiderNumCols; col++) {
-            let cards = state.board[col];
-            console.log("column " + col + ": " + cards.map(c2fp).join(" "));
-        }
-        console.log("stock: " + state.stock.map(c2fp).join(" "));
-        console.log("waste: " + state.waste.map(c2fp).join(" "));
-    }
-
-    function make_card(suit, rank, key, row, col, img) {
-        // Note that the key and fingerprint are different.  For fingerprint,
-        // identical rank+suit cards are interchangeable, but for uniqueness,
-        // they are not.
-        let card = { suit: suit,
-                     rank: rank,
-                     key: key,
-                     row: row,
-                     col: col,
-                     is_red: suit === "hearts" || suit === "diamonds",
-                     img: img,
-                     fingerprint: suit_rank_fp(suit, rank),
-                     left: img.style.left,
-                     top: img.style.top };
-        return card;
-    }
 
     async function find_solution(old_state, history, seen, depth) {
         // We are looking for *any* solution, so we can
@@ -478,7 +755,7 @@ async function solve() {
             solution = [];
             let last_move = null;
             for (let i = 0; i < history.length; i++) {
-                // move.card is non-null only for "shift_on_board" moves
+                // move.card is non-null only for "board_to_board" moves
                 // If the move is not a shift, then we immediately add
                 // it (and last move, if any) to the solution
                 let move = history[i];
@@ -509,14 +786,14 @@ async function solve() {
                 }
             }
             // last_move should be null since the last move in a solution
-            // must be a put_away move.
+            // must be a board_to_waste move.
             console.log("reduced solution, " + solution.length + " steps");
             return true;
         }
 
         if (debugging) {
             console.log("depth: " + depth);
-            // log_state(old_state);
+            old_state.log();
         }
 
         // There are two types of moves that we can make:
@@ -525,7 +802,7 @@ async function solve() {
         // If none of these lead to a solution, we are at a dead end
 
         // console.log("find moves");
-        let [p_moves, s_moves] = shift_on_board(old_state);
+        let [p_moves, s_moves] = board_to_board(old_state);
         // console.log(p_moves);
         // console.log(s_moves);
         // Shifting cards from one column to another is divided into
@@ -534,7 +811,7 @@ async function solve() {
         // the consecutive cards are left in the original column.
         // We try the primary moves first, but only try secondary
         // moves if dealing from stock does not yield a solution.
-        let d_moves = deal_from_stock(old_state);
+        let d_moves = stock_to_board(old_state);
         // console.log(d_moves);
         let moves = p_moves.concat(d_moves, s_moves);
         // console.log(moves);
@@ -582,8 +859,8 @@ async function solve() {
                 await Promise.allSettled(promises);
                 // console.log("moved cards");
             }
-            if (debugging && move.type == "put_away")
-                console.log(depth + ": put_away: waste pile length: " +
+            if (debugging && move.type == "board_to_waste")
+                console.log(depth + ": board_to_waste: waste pile length: " +
                             state.waste.length);
             history.push(move);
             let found = await find_solution(state, history, seen, depth + 1);
@@ -616,278 +893,13 @@ async function solve() {
         return any_solution;
     }
 
-    function shift_on_board(state) {
-
-        function top_stack(col) {
-            let column = state.board[col];
-            if (column.length == 0)
-                return { col: col,
-                         row: -1,
-                         length: 0,
-                         card: null };
-            let row = column.length - 1;
-            let card = column[row];
-            while (row > 0) {
-                next_card = column[row - 1];
-                if (next_card.suit != card.suit ||
-                    next_card.rank != RankAbove[card.rank])
-                        break;
-                row--;
-                card = next_card;
-            }
-            return { length: column.length - row,
-                     col: col,
-                     row: row,
-                     card: card };
-        }
-
-        function can_move(stacks, fcol, tcol) {
-            // can_move finds all the moves from column fcol to column tcol.
-            // The moves are separated into primary and secondary moves.
-            // Primary moves are those that should be tried before dealing
-            // from stack.  Secondary and tertiary moves are those that
-            // should be tried after.  Tertiary moves are those that move
-            // part of a stack onto another of the same suit; they leave
-            // the top card the same in both columns, so are less interesting.
-            // Assumes that fcol != tcol.
-            // console.log("can move: " + col + ", " + row + " => " + tcol);
-            let primary = [];
-            let secondary = [];
-            let tertiary = [];
-            let fstack = stacks[fcol];
-            if (fstack.length == 0) {
-                // If "from" column is empty, there are no moves available.
-                return [primary, secondary, tertiary];
-            }
-            let tstack = stacks[tcol];
-            let fc = state.board[fcol];
-            let tc = state.board[tcol];
-            if (tc.length == 0) {
-                // If the "to" column is empty, we try to move different
-                // number of cards from the column.  The only move we
-                // do not attempt is to move all of the "from" column
-                // (starting with row 0) to the "to" column since that
-                // cannot help find a solution.
-                let row = fstack.row;
-                if (row != 0) {
-                    let move = { type: "shift_on_board",
-                                 card: fc[row],
-                                 apply_func: apply_shift_on_board,
-                                 from_col: fcol,
-                                 from_row: row,
-                                 to_col: tcol };
-                    primary.push(move);
-                }
-                while (++row < fc.length) {
-                    let move = { type: "shift_on_board",
-                                 card: fc[row],
-                                 apply_func: apply_shift_on_board,
-                                 from_col: fcol,
-                                 from_row: row,
-                                 to_col: tcol };
-                    secondary.push(move);
-                }
-            } else {
-                let tcard = tc[tc.length - 1];
-                for (let row = fstack.row; row < fc.length; row++) {
-                    let fcard = fc[row];
-                    if (tcard.rank != RankAbove[fcard.rank])
-                        continue;
-                    let move = { type: "shift_on_board",
-                                 card: fcard,
-                                 apply_func: apply_shift_on_board,
-                                 from_col: fcol,
-                                 from_row: row,
-                                 to_col: tcol };
-                    // There are three possibilities:
-                    // - The destination column is a different suit than the
-                    //   source stack.  This is a secondary move that we can
-                    //   explore later (after dealing from stock).
-                    //   Do not bother moving a partial stack over another
-                    //   suit since that rarely results in a solution.
-                    // - We are moving the entire stack to a new column.
-                    //   We want to explore this first since it reveals
-                    //   a new stack under the current one.
-                    // - We are moving part of the stack to a new column.
-                    //   This can be useful if we are creating a larger
-                    //   stack in the new column, which we can explore
-                    //   now; otherwise, we explore later (after moving
-                    //   entire stacks onto different suits).
-                    if (fcard.suit != tcard.suit) {
-                        if (row == fstack.row)
-                            secondary.push(move);
-                    } else {
-                        let moving = fc.length - row;
-                        if (moving + tstack.length > fstack.length)
-                        // if (row == fstack.row)
-                            primary.push(move);
-                        else
-                        //    secondary.push(move);
-                            tertiary.push(move);
-                    }
-                    break;
-                }
-            }
-            return [primary, secondary, tertiary];
-        }
-
-        // First we find the stacks (consecutive cards of the same suit)
-        // for each column.  If any stack is complete (A->K), we create
-        // a primary move to put the stack away.
-        let primary_moves = [];
-        let secondary_moves = [];
-        let tertiary_moves = [];
-        let stacks = [];
-        for (let col = 0; col < SpiderNumCols; col++) {
-            let stack = top_stack(col);
-            stacks[col] = stack;
-            if (stack.length >= 13) {
-                // console.log("found full stack: " + stack.length);
-                primary_moves.push({ type: "put_away",
-                                     card: null,
-                                     apply_func: apply_put_away,
-                                     col: col });
-            }
-        }
-
-        for (let fcol = 0; fcol < SpiderNumCols; fcol++) {
-            for (let tcol = 0; tcol < SpiderNumCols; tcol++) {
-                if (fcol == tcol)
-                    continue;
-                let [p_moves, s_moves, t_moves] = can_move(stacks, fcol, tcol);
-                primary_moves.push(...p_moves);
-                secondary_moves.push(...s_moves);
-                tertiary_moves.push(...t_moves);
-            }
-        }
-        // combine secondary and tertiary moves since they will all
-        // be tried after dealing from stock.
-        secondary_moves.push(...tertiary_moves);
-        return [primary_moves, secondary_moves];
-    }
-
-    function apply_shift_on_board(old_state, move, detailed) {
-        let state = old_state.copy();
-        let from_column = state.board[move.from_col];
-        let to_column = state.board[move.to_col];
-        let cards = from_column.splice(move.from_row);
-        to_column.push(...cards);
-        if (!detailed)
-            return state;
-        let moved = [];
-        for (let i = 0; i < cards.length; i++) {
-            let s_row = from_column.length + i;
-            let d_row = to_column.length - cards.length + i;
-            moved.push({ card: cards[i],
-                         src_col: move.from_col,
-                         src_row: s_row,
-                         src_z: s_row,
-                         dst_col: move.to_col,
-                         dst_row: d_row,
-                         dst_z: d_row });
-        }
-        return { state: state,
-                 moved: moved,
-                 max_height: to_column.length };
-    }
-
-    function apply_put_away(old_state, move, detailed) {
-        let state = old_state.copy();
-        let column = state.board[move.col];
-        let cards = column.splice(column.length - 13);
-        state.waste.push(...cards);
-        if (!detailed)
-            return state;
-        let moved = [];
-        for (let i = 0; i < cards.length; i++) {
-            let s_row = column.length + i;
-            let d_row = state.waste.length - cards.length + i;
-            moved.push({ card: cards[i],
-                         src_col: move.col,
-                         src_row: s_row,
-                         src_z: s_row,
-                         dst_col: 0,
-                         dst_row: WasteRow,
-                         dst_z: d_row });
-        }
-        return { state: state,
-                 moved: moved,
-                 max_height: column.length };
-    }
-
-    function deal_from_stock(state) {
-        let moves = [];
-        let num_cards = Math.min(state.stock.length, SpiderNumCols);
-        if (num_cards > 0)
-            moves.push({ type: "deal_from_stock",
-                         card: null,
-                         apply_func: apply_deal_from_stock,
-                         num_cards: num_cards });
-        return moves;
-    }
-
-    function apply_deal_from_stock(old_state, move, detailed) {
-        let state = old_state.copy();
-        let cards = state.stock.splice(state.stock.length - move.num_cards);
-        for (let i = 0; i < cards.length; i++) {
-            let n = cards.length - i - 1;
-            let column = state.board[i];
-            column.push(cards[n]);
-        }
-        if (!detailed)
-            return state;
-        let moved = [];
-        let max_height = 0;
-        for (let i = 0; i < cards.length; i++) {
-            let n = cards.length - i - 1;
-            let s_col = state.stock.length + i;
-            let d_row = state.board[i].length - 1;
-            moved.push({ card: cards[n],
-                         src_col: s_col,
-                         src_row: StockRow,
-                         src_z: s_col,
-                         dst_col: i,
-                         dst_row: d_row,
-                         dst_z: d_row });
-            let height = state.board[i].length;
-            if (height > max_height)
-                max_height = height;
-        }
-        return { state: state,
-                 moved: moved,
-                 max_height: max_height };
-    }
-
-    async function init() {
+    async function depth_first_search() {
         // Code wrapped in function so that local variables do not leak
         // to other functions.
 
-        // Build data structures
-        let waste = [];
-        let stock = [];
-        let board = [];
-        for (let col = 0; col < SpiderNumCols; col++)
-            board[col] = [];
-        for (let img of spider_div.querySelectorAll("img")) {
-            let col = parseInt(img.getAttribute("data-col"), 10);
-            let row = parseInt(img.getAttribute("data-row"), 10);
-            let suit = img.getAttribute("data-suit");
-            let rank = img.getAttribute("data-rank");
-            let key = img.getAttribute("data-key");
-            let card = make_card(suit, rank, key, row, col, img);
-            if (row == StockRow)
-                stock[col] = card;
-            else if (row != WasteRow)
-                board[col][row] = card;
-        }
-        // console.log("initialized");
-        // console.log(waste);
-        // console.log(board);
-        // console.log(stock);
-        let init_state = make_state(waste, board, stock);
+        let init_state = await make_init_state();
         // console.log(init_state);
         // console.log("fingerprint: " + init_state.fingerprint());
-
         let history = [];
         let seen = new Set();
         seen.add(init_state.fingerprint());
@@ -901,10 +913,8 @@ async function solve() {
         player_controls.set_controller(controller);
     };
 
-    await init();
+    await depth_first_search();
 }
-
-window.addEventListener("load", init);
 
 //=============================================================================
 // Code for interacting with player controls
@@ -959,7 +969,7 @@ async function Solution(state, move_list) {
         return Promise.allSettled(promises);
     }
 
-    async function init() {
+    async function initialize() {
         // First we run through all the moves to find the maximum
         // number of cards in a column.  Then we back calculate
         // the vertical card overlap.
@@ -1010,7 +1020,7 @@ async function Solution(state, move_list) {
         // waste should be empty so no need to record there
     };
 
-    await init();
+    await initialize();
     return {
         play_interval: 2000,        // interval between moves while playing
         get_state: get_state,
