@@ -66,7 +66,9 @@ function position_assign(img, rank, suit, key) {
     img.src = card_img_url(rank, suit);
     card_used(key, true);
     assigned_positions++;
-    document.getElementById("solve").disabled = assigned_positions != NumCards;
+    let disabled = assigned_positions != NumCards;
+    document.getElementById("solve").disabled = disabled;
+    // document.getElementById("solve2").disabled = disabled;
 }
 
 function position_cancel(img, rank, suit, key) {
@@ -76,7 +78,9 @@ function position_cancel(img, rank, suit, key) {
     img.src = card_back_url();
     card_used(key, false);
     assigned_positions--
-    document.getElementById("solve").disabled = assigned_positions != NumCards;
+    let disabled = assigned_positions != NumCards;
+    document.getElementById("solve").disabled = disabled;
+    // document.getElementById("solve2").disabled = disabled;
 }
 
 function _cancel_handler(ev) {
@@ -339,12 +343,18 @@ function reset() {
     let cards = document.getElementById("cards");
     cards.innerHTML = "";
     cards.appendChild(cards_table_gen());
-    document.getElementById("solve").disabled = assigned_positions != NumCards;
+    let disabled = assigned_positions != NumCards;
+    document.getElementById("solve").disabled = disabled;
+    // document.getElementById("solve2").disabled = disabled;
     player_controls.set_controller(null);
 }
 
 async function _solve_handler(ev) {
-    await solve();
+    await depth_first_search();
+}
+
+async function _solve2_handler(ev) {
+    await breadth_first_search();
 }
 
 function _reset_handler(ev) {
@@ -365,6 +375,7 @@ function init() {
     cards_table_init(SuitCount);
     reset();
     document.getElementById("solve").addEventListener("click", _solve_handler);
+    // document.getElementById("solve2").addEventListener("click", _solve2_handler);
     document.getElementById("reset").addEventListener("click", _reset_handler);
     document.getElementById("test").addEventListener("click", _test_handler);
 }
@@ -696,7 +707,7 @@ function apply_stock_to_board(old_state, move, detailed) {
              max_height: max_height };
 }
 
-async function make_init_state() {
+function make_init_state() {
     // Code wrapped in function so that local variables do not leak
     // to other functions.
 
@@ -728,7 +739,7 @@ async function make_init_state() {
     return init_state;
 }
 
-async function solve() {
+async function depth_first_search() {
 
     let solution = null;
     let max_depth = 1000;
@@ -736,10 +747,6 @@ async function solve() {
     async function find_solution(old_state, history, seen, depth) {
         // We are looking for *any* solution, so we can
         // return immediately if we find one.
-
-        // Make interruptible?
-        await Promise.resolve(0);
-
         if (max_depth > 0 && depth >= max_depth) {
             // Possible optimization when looking for shortest solution?
             if (debugging)
@@ -893,11 +900,11 @@ async function solve() {
         return any_solution;
     }
 
-    async function depth_first_search() {
+    async function init_search() {
         // Code wrapped in function so that local variables do not leak
         // to other functions.
 
-        let init_state = await make_init_state();
+        let init_state = make_init_state();
         // console.log(init_state);
         // console.log("fingerprint: " + init_state.fingerprint());
         let history = [];
@@ -913,7 +920,109 @@ async function solve() {
         player_controls.set_controller(controller);
     };
 
-    await depth_first_search();
+    await init_search();
+}
+
+async function breadth_first_search() {
+
+    let search_list = [];
+
+    function is_solution(old_state) {
+        // If all the cards are in the waste pile, we have a solution
+        return old_state.waste.length == NumCards;
+    }
+
+    function add_to_search(old_state, seen) {
+        // There are two types of moves that we can make:
+        // - shift card(s) from one column to another
+        // - deal from stock
+        // If none of these lead to a solution, we are at a dead end
+
+        // console.log("find moves");
+        let [p_moves, s_moves] = board_to_board(old_state);
+        // console.log(p_moves);
+        // console.log(s_moves);
+        // Shifting cards from one column to another is divided into
+        // "primary" moves where all consecutive cards at the top of
+        // the column are moved, and "secondary" moves where some of
+        // the consecutive cards are left in the original column.
+        // We try the primary moves first, but only try secondary
+        // moves if dealing from stock does not yield a solution.
+        let d_moves = stock_to_board(old_state);
+        // console.log(d_moves);
+        let moves = p_moves.concat(d_moves, s_moves);
+        // console.log(moves);
+
+        // Unlike depth first search, we just append resulting
+        // state from each move to the search list and return
+        for (let move of moves) {
+            // console.log(move);
+            let state = move.apply_func(old_state, move, false);
+            // If move cannot be applied or resulting state has already
+            // been visited, just continue to next move
+            if (state == null)
+                continue;
+            let fp = state.fingerprint();
+            if (seen.has(fp)) {
+                // console.log("skipping previously visited state");
+                continue;
+            }
+            seen.add(fp);
+            append_state(state, old_state, move);
+        }
+        return false;
+    }
+
+    function append_state(state, parent, move) {
+        search_list.push(state);
+        state.parent = parent;
+        state.move = move;
+    }
+
+    function get_next_state() {
+        return search_list.shift();
+    }
+
+    async function init_search() {
+        // Code wrapped in function so that local variables do not leak
+        // to other functions.
+
+        let init_state = make_init_state();
+        // console.log(init_state);
+        // console.log("fingerprint: " + init_state.fingerprint());
+        append_state(init_state, null, null);
+        let seen = new Set();
+        seen.add(init_state.fingerprint());
+        let end_state = null;
+        let report_at = 100000;
+        while (search_list.length > 0 && end_state == null) {
+            let state = get_next_state();
+            if (is_solution(state)) {
+                console.log("found solution!");
+                end_state = state;
+            } else {
+                add_to_search(state, seen);
+                if (search_list.length >= report_at) {
+                    console.log("search length: " + search_list.length);
+                    report_at += 100000;
+                }
+            }
+        }
+        if (end_state == null)
+            alert("No solution found.");
+        else {
+            let move_list = [];
+            for (let state = end_state; state != null; state = state.parent)
+                solution.push(state.move);
+            solution.reverse();
+            alert("Found solution using " + solution.length + " steps");
+        }
+        // console.log(solution);
+        controller = await Solution(init_state, solution)
+        player_controls.set_controller(controller);
+    };
+
+    await init_search();
 }
 
 //=============================================================================
