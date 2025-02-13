@@ -1,0 +1,17 @@
+Implement solver for Spider
+-  Current implementation works but does not generate the
+   optimal solution.  Currently, the first solution is returned
+   immediately because continuing to search (even limited by
+   the number of moves in a known solution) is prohibitively
+   expensive.  There might be a better way to post-process the
+   solution to get rid of unneeded moves, but I have not
+   thought too much about it yet.  -- Feb 5, 2025
+
+Test breadth-first search
+-  We are already storing a bunch of state fingerprints to avoid
+   repeated searches.  Perhaps storing an entire state is not that
+   much more expensive.  Since breadth-first search would find the
+   shortest solution first, we may even avoid some rabbit holes
+   that lead nowhere.  -- Feb 11, 2025
+   Unforuntately, the search queue grows up to a million states and
+   just takes too long to run (at least in Firefox).  -- Feb 12, 2025
