@@ -47,11 +47,10 @@ function PlayerControls (element_ids) {
     }
 
     async function cb_restart() {
-        if (play_timeout) {
-            clearTimeout(play_timeout);
-            play_timeout = null;
-        }
+        if (play_timeout)
+            await cb_pause();
         await controller.restart();
+        play_timeout = null;
         update_state(controller.get_state());
     }
 
