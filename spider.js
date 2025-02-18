@@ -1075,7 +1075,8 @@ async function Solution(state, move_list) {
         for (let card of init_state.stock)
             promises.push(move_card(card.img, card.init_left,
                                     card.init_top, card.init_z, 500));
-        return Promise.allSettled(promises);
+        await Promise.allSettled(promises);
+        move_position = 0;
     }
 
     async function initialize() {
