@@ -759,39 +759,7 @@ async function depth_first_search() {
             // solution = history.slice();
             console.log("found solution, " + history.length + " steps");
             max_depth = depth;
-            solution = [];
-            let last_move = null;
-            for (let i = 0; i < history.length; i++) {
-                // move.card is non-null only for "board_to_board" moves
-                // If the move is not a shift, then we immediately add
-                // it (and last move, if any) to the solution
-                let move = history[i];
-                if (move.card == null) {
-                    if (last_move != null) {
-                        solution.push(last_move);
-                        last_move = null;
-                    }
-                    solution.push(move);
-                    continue;
-                }
-                // If the previous move was a shift, but it is moving
-                // a different card, then we add the previous move to
-                // the solution and make keep this move to check whether
-                // it can be combined with the next move.  If the last
-                // move is moving exactly the same card as this, we
-                // combine the two into a single move whose source is
-                // from the last move and destination is from this move.
-                if (last_move == null)
-                    last_move = move;
-                else if (last_move.card != move.card) {
-                    solution.push(last_move);
-                    last_move = move;
-                } else {
-                    let new_move = { ...last_move };
-                    new_move.to_col = move.to_col;
-                    last_move = new_move;
-                }
-            }
+            solution = optimize_solution(history);
             // last_move should be null since the last move in a solution
             // must be a board_to_waste move.
             console.log("reduced solution, " + solution.length + " steps");
@@ -919,6 +887,43 @@ async function depth_first_search() {
         controller = await Solution(init_state, solution)
         player_controls.set_controller(controller);
     };
+
+    function optimize_solution(history) {
+        let solution = [];
+        let last_move = null;
+        for (let i = 0; i < history.length; i++) {
+            // move.card is non-null only for "board_to_board" moves
+            // If the move is not a shift, then we immediately add
+            // it (and last move, if any) to the solution
+            let move = history[i];
+            if (move.card == null) {
+                if (last_move != null) {
+                    solution.push(last_move);
+                    last_move = null;
+                }
+                solution.push(move);
+                continue;
+            }
+            // If the previous move was a shift, but it is moving
+            // a different card, then we add the previous move to
+            // the solution and make keep this move to check whether
+            // it can be combined with the next move.  If the last
+            // move is moving exactly the same card as this, we
+            // combine the two into a single move whose source is
+            // from the last move and destination is from this move.
+            if (last_move == null)
+                last_move = move;
+            else if (last_move.card != move.card) {
+                solution.push(last_move);
+                last_move = move;
+            } else {
+                let new_move = { ...last_move };
+                new_move.to_col = move.to_col;
+                last_move = new_move;
+            }
+        }
+        return solution;
+    }
 
     await init_search();
 }
