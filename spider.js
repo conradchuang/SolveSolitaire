@@ -6,10 +6,12 @@ const NumCards = 52 * 2;
 const InitialDeal = 54;
 const StockSize = NumCards - InitialDeal;
 const StockRow = -1;
-const WasteRow = -2;
+const CompleteRow = -2;
 const SpiderScale = 1;
+const TimeoutInterval = 60000;           // Timeout in ms
 
 const debugging = false;
+const animate = false;
 
 var RankAbove = {
     'ace': '2',
@@ -45,7 +47,7 @@ var player_controls = null;
 var spider_div = null;
 var column_card_height = new Array(SpiderNumCols);
 var layout = {};
-var waste_img = null;
+var complete_img = null;
 
 //=============================================================================
 // UI
@@ -117,7 +119,7 @@ function _click_handler(ev) {
 
 function spider_gen() {
     // Vertically, the game is divided into two sections:
-    // the board, and the stock pile + waste pile.
+    // the board, and the stock pile + complete pile.
     // The sections are separate by "section_gap" card-heights;
     //
     // For the board, there are 10 columns with a total of 54
@@ -133,7 +135,7 @@ function spider_gen() {
     // solution is found.
     //
     // The stock pile takes most of the left portion of the second
-    // section, while the waste pile takes one full card width.
+    // section, while the complete pile takes one full card width.
     // For the stock pile, there are StockSize cards.  The
     // available space is evenly divided for the cards, so the
     // any overlap is the result of insufficient space to show
@@ -159,7 +161,7 @@ function spider_gen() {
                                      (SpiderNumCols - 1) * col_gap);
     let gap_width = col_gap * card_width;
 
-    // For stock pile + waste pile
+    // For stock pile + complete pile
     let num_stock_rows = 2;
     let row_gap = 1 / 8;
     let stock_height = (num_stock_rows + (num_stock_rows - 1) * row_gap) *
@@ -231,7 +233,7 @@ function add_stock(div, num_cards, num_rows, row_gap,
     let cards_per_row = Math.trunc(num_cards / num_rows);
     // The cards overlap by a half card width, so there are a total
     // of N+1 half-card widths for the stock.  
-    // The waste well is separated from the last card by a half-card
+    // The complete well is separated from the last card by a half-card
     // width and the wll itself is a full-card width, so an additional
     // 3 half-card widths are needed for the row.
     let card_width = 1 / (cards_per_row + 1 + 3);
@@ -264,10 +266,10 @@ function add_stock(div, num_cards, num_rows, row_gap,
         div.appendChild(img);
     }
 
-    // Add the waste pile
+    // Add the complete pile
     let img = document.createElement("img");
     img.draggable = false;
-    img.setAttribute("data-row", WasteRow);
+    img.setAttribute("data-row", CompleteRow);
     img.setAttribute("data-col", 0);
     img.setAttribute("data-rank", "");
     img.setAttribute("data-suit", "");
@@ -278,7 +280,7 @@ function add_stock(div, num_cards, num_rows, row_gap,
     img.classList.add("spider-center");
     let left = card_width * (cards_per_row + 3);
     img.style.left = percent(left);
-    // Place waste pile in vertical middle
+    // Place complete pile in vertical middle
     let yoffset = section_height / 2 - CardHeight / 2;
     img.style.top = height_unit(section_top + yoffset);
     img.src = card_well_url();
@@ -287,7 +289,7 @@ function add_stock(div, num_cards, num_rows, row_gap,
     img.addEventListener("dragenter", _cancel_handler);
     img.addEventListener("dragover", _cancel_handler);
     div.appendChild(img);
-    waste_img = img;
+    complete_img = img;
 
     layout.stock_card_width = card_width;
     layout.stock_cards_per_row = cards_per_row;
@@ -304,17 +306,17 @@ function find_stock_card(index) {
 }
 
 function find_position(col, row) {
-    if (row == WasteRow)
-        return waste_position();
+    if (row == CompleteRow)
+        return complete_position();
     else if (row == StockRow)
         return stock_position(col);
     else
         return board_position(col, row);
 }
 
-function waste_position() {
-    return { left: waste_img.style.left,
-             top: waste_img.style.top };
+function complete_position() {
+    return { left: complete_img.style.left,
+             top: complete_img.style.top };
 }
 
 function board_position(col, row) {
@@ -350,7 +352,11 @@ function reset() {
 }
 
 async function _solve_handler(ev) {
-    await depth_first_search();
+    try {
+        await depth_first_search(performance.now() + TimeoutInterval);
+    } catch (e) {
+        alert(e);
+    }
 }
 
 async function _solve2_handler(ev) {
@@ -409,24 +415,24 @@ function make_card(suit, rank, key, row, col, img) {
     return card;
 }
 
-function make_state(waste, board, stock) {
+function make_state(complete, board, stock) {
 
     function fingerprint() {
         // To uniquely identify the state, we construct
         // a string that is the concatenation of the column
-        // cards, the stock pile cards, and the waste pile cards
+        // cards, the stock pile cards, and the complete pile cards
         let fp = [];
         for (let col = 0; col < SpiderNumCols; col++)
             fp.push(board[col].map(card => card.fingerprint).join(""))
         // Sort the columns because order does not matter
         // for finding a solution.  Stock cards do not need
         // to be sorted since they should always be in the
-        // same order.  Waste pile cards do not be included
+        // same order.  Complete pile cards do not be included
         // because order they are whatever is not on the board
         // or in the stock pile and order does not matter
         fp.sort();
         fp.push(stock.map(card => card.fingerprint).join(""));
-        // fp.push(waste.map(card => card.fingerprint).join(""));
+        // fp.push(complete.map(card => card.fingerprint).join(""));
         return fp.join("/");
     }
 
@@ -435,10 +441,10 @@ function make_state(waste, board, stock) {
         // the playing state variables
         // "board" needs to be copied per column (array)
         // "stock" needs to be copied (array)
-        // "waste" needs to be copied (array)
+        // "complete" needs to be copied (array)
         // The array copying can be shallow since the array elements are
         // cards, whose properties never change.
-        let new_w = waste.slice();
+        let new_w = complete.slice();
         let new_b = new Array(board.length);
         for (let i = 0; i < new_b.length; i++)
             new_b[i] = board[i].slice();
@@ -454,12 +460,12 @@ function make_state(waste, board, stock) {
             console.log("column " + col + ": " + cards.map(c2fp).join(" "));
         }
         console.log("stock: " + stock.map(c2fp).join(" "));
-        console.log("waste: " + waste.map(c2fp).join(" "));
+        console.log("complete: " + complete.map(c2fp).join(" "));
     }
 
     return { board: board,
              stock: stock,
-             waste: waste,
+             complete: complete,
              copy: copy,
              log: log,
              fingerprint: fingerprint }
@@ -527,6 +533,7 @@ function board_to_board(state) {
                              to_col: tcol };
                 primary.push(move);
             }
+            /* Do not bother with partial stack moves to empty columns
             while (++row < fc.length) {
                 let move = { type: "board_to_board",
                              card: fc[row],
@@ -536,6 +543,7 @@ function board_to_board(state) {
                              to_col: tcol };
                 secondary.push(move);
             }
+            */
         } else {
             let tcard = tc[tc.length - 1];
             for (let row = fstack.row; row < fc.length; row++) {
@@ -583,6 +591,7 @@ function board_to_board(state) {
     // First we find the stacks (consecutive cards of the same suit)
     // for each column.  If any stack is complete (A->K), we create
     // a primary move to put the stack away.
+    let complete_moves = [];
     let primary_moves = [];
     let secondary_moves = [];
     let tertiary_moves = [];
@@ -592,10 +601,10 @@ function board_to_board(state) {
         stacks[col] = stack;
         if (stack.length >= 13) {
             // console.log("found full stack: " + stack.length);
-            primary_moves.push({ type: "board_to_waste",
-                                 card: null,
-                                 apply_func: apply_board_to_waste,
-                                 col: col });
+            complete_moves.push({ type: "board_to_complete",
+                                  card: null,
+                                  apply_func: apply_board_to_complete,
+                                  col: col });
         }
     }
 
@@ -612,7 +621,8 @@ function board_to_board(state) {
     // combine secondary and tertiary moves since they will all
     // be tried after dealing from stock.
     secondary_moves.push(...tertiary_moves);
-    return [primary_moves, secondary_moves];
+    complete_moves.push(...primary_moves);
+    return [complete_moves, secondary_moves];
 }
 
 function apply_board_to_board(old_state, move, detailed) {
@@ -640,23 +650,23 @@ function apply_board_to_board(old_state, move, detailed) {
              max_height: to_column.length };
 }
 
-function apply_board_to_waste(old_state, move, detailed) {
+function apply_board_to_complete(old_state, move, detailed) {
     let state = old_state.copy();
     let column = state.board[move.col];
     let cards = column.splice(column.length - 13);
-    state.waste.push(...cards);
+    state.complete.push(...cards);
     if (!detailed)
         return state;
     let moved = [];
     for (let i = 0; i < cards.length; i++) {
         let s_row = column.length + i;
-        let d_row = state.waste.length - cards.length + i;
+        let d_row = state.complete.length - cards.length + i;
         moved.push({ card: cards[i],
                      src_col: move.col,
                      src_row: s_row,
                      src_z: s_row,
                      dst_col: 0,
-                     dst_row: WasteRow,
+                     dst_row: CompleteRow,
                      dst_z: d_row });
     }
     return { state: state,
@@ -712,7 +722,7 @@ function make_init_state() {
     // to other functions.
 
     // Build data structures
-    let waste = [];
+    let complete = [];
     let stock = [];
     let board = [];
     for (let col = 0; col < SpiderNumCols; col++)
@@ -726,25 +736,28 @@ function make_init_state() {
         let card = make_card(suit, rank, key, row, col, img);
         if (row == StockRow)
             stock[col] = card;
-        else if (row != WasteRow)
+        else if (row != CompleteRow)
             board[col][row] = card;
     }
     // console.log("initialized");
-    // console.log(waste);
+    // console.log(complete);
     // console.log(board);
     // console.log(stock);
-    let init_state = make_state(waste, board, stock);
+    let init_state = make_state(complete, board, stock);
     // console.log(init_state);
     // console.log("fingerprint: " + init_state.fingerprint());
     return init_state;
 }
 
-async function depth_first_search() {
+async function depth_first_search(stop_time) {
 
     let solution = null;
     let max_depth = 1000;
 
     async function find_solution(old_state, history, seen, depth) {
+        if (performance.now() > stop_time)
+            throw new Error("search timed out");
+
         // We are looking for *any* solution, so we can
         // return immediately if we find one.
         if (max_depth > 0 && depth >= max_depth) {
@@ -753,15 +766,15 @@ async function depth_first_search() {
                 console.log("reached max_depth " + depth + " / " + max_depth);
             return false;
         }
-
-        // If all the cards are in the waste pile, we have a solution
-        if (old_state.waste.length == NumCards) {
+        
+        // If all the cards are in the complete pile, we have a solution
+        if (old_state.complete.length == NumCards) {
             // solution = history.slice();
             console.log("found solution, " + history.length + " steps");
             max_depth = depth;
             solution = optimize_solution(history);
             // last_move should be null since the last move in a solution
-            // must be a board_to_waste move.
+            // must be a board_to_complete move.
             console.log("reduced solution, " + solution.length + " steps");
             return true;
         }
@@ -798,7 +811,7 @@ async function depth_first_search() {
             // console.log(move);
             let state;
             let result;
-            if (!debugging)
+            if (!animate)
                 state = move.apply_func(old_state, move, false);
             else {
                 result = move.apply_func(old_state, move, true);
@@ -817,7 +830,7 @@ async function depth_first_search() {
             seen.add(fp);
 
             // console.log(state);
-            if (debugging) {
+            if (animate) {
                 // console.log(state.fingerprint());
                 // animate forward action
                 let promises = [];
@@ -834,9 +847,9 @@ async function depth_first_search() {
                 await Promise.allSettled(promises);
                 // console.log("moved cards");
             }
-            if (debugging && move.type == "board_to_waste")
-                console.log(depth + ": board_to_waste: waste pile length: " +
-                            state.waste.length);
+            if (debugging && move.type == "board_to_complete")
+                console.log(depth + ": board_to_complete: pile length: " +
+                            state.complete.length);
             history.push(move);
             let found = await find_solution(state, history, seen, depth + 1);
             history.pop();
@@ -933,8 +946,8 @@ async function breadth_first_search() {
     let search_list = [];
 
     function is_solution(old_state) {
-        // If all the cards are in the waste pile, we have a solution
-        return old_state.waste.length == NumCards;
+        // If all the cards are in the complete pile, we have a solution
+        return old_state.complete.length == NumCards;
     }
 
     function add_to_search(old_state, seen) {
@@ -1132,7 +1145,7 @@ async function Solution(state, move_list) {
                 record_pos(card);
         for (let card of init_state.stock)
             record_pos(card);
-        // waste should be empty so no need to record there
+        // complete should be empty so no need to record there
     };
 
     await initialize();
