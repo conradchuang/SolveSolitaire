@@ -473,14 +473,14 @@ function make_state(complete, board, stock) {
 
 function board_to_board(state) {
 
-    function top_stack(col) {
+    function top_stack(col, start_row) {
         let column = state.board[col];
         if (column.length == 0)
             return { col: col,
                      row: -1,
                      length: 0,
                      card: null };
-        let row = column.length - 1;
+        let row = start_row < 0 ? column.length - 1 : start_row;
         let card = column[row];
         while (row > 0) {
             next_card = column[row - 1];
@@ -505,6 +505,12 @@ function board_to_board(state) {
         // part of a stack onto another of the same suit; they leave
         // the top card the same in both columns, so are less interesting.
         // Assumes that fcol != tcol.
+
+        // The score for a move is the larger height of the stack
+        // formed in the destination column or exposed stack in
+        // source column.  The idea is to favor moves that create
+        // larger stacks.
+
         // console.log("can move: " + col + ", " + row + " => " + tcol);
         let primary = [];
         let secondary = [];
@@ -530,7 +536,8 @@ function board_to_board(state) {
                              apply_func: apply_board_to_board,
                              from_col: fcol,
                              from_row: row,
-                             to_col: tcol };
+                             to_col: tcol,
+                             score: fstack.length - row };
                 primary.push(move);
             }
             /* Do not bother with partial stack moves to empty columns
@@ -540,7 +547,8 @@ function board_to_board(state) {
                              apply_func: apply_board_to_board,
                              from_col: fcol,
                              from_row: row,
-                             to_col: tcol };
+                             to_col: tcol,
+                             score: fstack.length - row };
                 secondary.push(move);
             }
             */
@@ -556,6 +564,15 @@ function board_to_board(state) {
                              from_col: fcol,
                              from_row: row,
                              to_col: tcol };
+                let under_score = -1;
+                if (row == fstack.row && row > 0) {
+                    // We are moving the entire stack and exposing
+                    // the one underneath, so our score is potentially
+                    // higher if the underneath stack is large
+                    let ts = top_stack(fstack.col, fstack.row - 1);
+                    under_score = ts.length;
+                }
+                let moving = fc.length - row;
                 // There are three possibilities:
                 // - The destination column is a different suit than the
                 //   source stack.  This is a secondary move that we can
@@ -571,11 +588,12 @@ function board_to_board(state) {
                 //   now; otherwise, we explore later (after moving
                 //   entire stacks onto different suits).
                 if (fcard.suit != tcard.suit) {
+                    move.score = Math.max(moving, under_score);
                     if (row == fstack.row)
                         secondary.push(move);
                 } else {
-                    let moving = fc.length - row;
-                    if (moving + tstack.length > fstack.length)
+                    move.score = Math.max(moving + tstack.length, under_score);
+                    if (move.score > fstack.length)
                     // if (row == fstack.row)
                         primary.push(move);
                     else
@@ -597,7 +615,7 @@ function board_to_board(state) {
     let tertiary_moves = [];
     let stacks = [];
     for (let col = 0; col < SpiderNumCols; col++) {
-        let stack = top_stack(col);
+        let stack = top_stack(col, -1);
         stacks[col] = stack;
         if (stack.length >= 13) {
             // console.log("found full stack: " + stack.length);
@@ -620,6 +638,12 @@ function board_to_board(state) {
     }
     // combine secondary and tertiary moves since they will all
     // be tried after dealing from stock.
+    function compare_moves(m1, m2) {
+        return m2.score - m1.score;
+    }
+    primary_moves.sort(compare_moves);
+    secondary_moves.sort(compare_moves);
+    tertiary_moves.sort(compare_moves);
     secondary_moves.push(...tertiary_moves);
     complete_moves.push(...primary_moves);
     return [complete_moves, secondary_moves];
