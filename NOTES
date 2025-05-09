@@ -1,0 +1,162 @@
+Implement solver for Spider
+-  Current implementation works but does not generate the
+   optimal solution.  Currently, the first solution is returned
+   immediately because continuing to search (even limited by
+   the number of moves in a known solution) is prohibitively
+   expensive.  There might be a better way to post-process the
+   solution to get rid of unneeded moves, but I have not
+   thought too much about it yet.  -- Feb 5, 2025
+
+Test breadth-first search
+-  We are already storing a bunch of state fingerprints to avoid
+   repeated searches.  Perhaps storing an entire state is not that
+   much more expensive.  Since breadth-first search would find the
+   shortest solution first, we may even avoid some rabbit holes
+   that lead nowhere.  -- Feb 11, 2025
+   Unforuntately, the search queue grows up to a million states and
+   just takes too long to run (at least in Firefox).  -- Feb 12, 2025
+
+Optimize existing solution
+-  Neither Pyramid nor TriPeaks need optimizing since we are either
+   removing cards or dealing from stock.  We already try to minimize
+   the number of times we deal from stock by trying card removals
+   first, so we should be getting either optimal or near optimal
+   solutions.
+-  For FreeCell, Klondike and Spider, we create stacks by placing
+   card(s) onto other columns on the board.  This potentially
+   introduces unnecessary stack movements.
+   -  We might try continuing to look for a solution of shorter
+      number of moves, but that is too time consuming.  It may be
+      possible to limit the search (eg do not search other top-level
+      moves) but none have strong rationale for working all the time.
+   -  We already apply a heuristic after a solution is found: if
+      the same card is stacked in two consecutive moves, they are
+      combined into a single move (move card from first-move source
+      column to second-move destination column).
+   -  We might be able to extend the previous heuristic by tracking
+      the moves made when the same card is moved twice.  Say the
+      first move transdered the card from column A to column B,
+      and the second from B to C.  If intervening moves do not touch
+      either column A or B, then we can remove the first move and
+      change the second move to A to C.  -- Feb 14, 2025
+   -  Tracking multiple cards does not significantly reduce the
+      number of moves in a solution.  -- Feb 18, 2025
+   *  Currently, the ordering of groups of legal moves is
+      empirical.  All permutations should be tested to see if
+      any is consistently better than all others.  Since we
+      assume that a solution can be found in a reasonable amount
+      of time, we can try each permutation with a timeout and
+      look at the results.  -- Feb 18, 2025
+
+Spider move ordering
+-  Moving cards from one column to another can be classified as:
+   1  Moving an entire stack onto a column of the same suit
+   2  Moving an entire stack onto a column of a different suit
+   +  Moving a partial stack onto a column of the same suit
+      3  The new stack is longer than the old stack
+      4  The new stack is the shorter or the same as the old stack
+   5  Moving a partial stack onto a column of a different suit
+   6  Moving an entire stack onto an empty column
+   7  Moving a partial stack onto an empty column
+   -  The order in which these types of moves are checked affect
+      the search length.  The most promising types should be tested
+      first (Primary); followed by dealing from the stock (Deal); and
+      finally the least promising types (Secondary).
+      - Type 1 is clearly type P.
+      - Type 2 is either low-priority type P or high-priority type S.
+      - Type 3 is either low-priority type P or high-priority type S. 
+      - Type 4 is low-priority S.
+      - Type 5 is low-priority S.
+      - Type 6 is type P behind type 1, but before 3 and 4.
+      - Type 7 is unlikely to yield a solution and therefore ignored.
+      - Type 4 and 5 are essentially equivalent in that they are the
+        last resort.
+      - So the ordering can be:
+        - 1, 6, D, 2, 3, 4, 5
+        - 1, 6, D, 3, 2, 4, 5
+        - 1, 6, 2, D, 3, 4, 5
+        - 1, 6, 3, D, 2, 4, 5
+        - 1, 6, 2, 3, D, 4, 5
+        - 1, 6, 3, 2, D, 4, 5
+   -  Tried this but it did not work well.  It looks like the move types
+      are not the determinant for finding shorter solutions.
+-  Moving the cards from one column (source) to another (target) can be grouped.
+   -  First grouping depends on the starting column suit:
+      1  Moving to a column of the same suit
+      2  Moving to a column of a different suit
+      3  Moving to an empty column
+   -  Second grouping depends on whether we leave cards of the same
+      suit behind:
+      A  The entire suit stack is moved
+      B  Only part of the suit stack is moved
+   -  Nomenclature definition:
+      -  L(S) = length of stack on the source column
+      -  L(T) = length of stack on the target column
+         -  L(T) = 0 when moving to an empty target column
+      -  L(US) = length of stack under the top stack on the source column
+      -  N = length of stack being moved from source to target
+      -  F(S) = length of stack on the source column after the move
+      -  F(T) = length of stack on the target column after the move
+      -  For A cases, N = L(S)
+      -  For B cases, N < L(S)
+   -  If we can assign a score to each move as to how "good" the resulting
+      card arrangement is, then we can use a greedy algorithm to try the
+      more promising moves first.
+   -  The resulting column stack lengths in the difference cases are:
+      1A  F(S) = L(US)           move entire stack to column of same suit
+          F(T) = L(S) + L(T)
+      1B  F(S) = L(S) - N        move partial stack to column of same suit
+          F(T) = N + L(T)
+      2A  F(S) = L(US)           move entire stack to column of different suit
+          F(T) = L(S)
+      2B  F(S) = L(S) - N        move partial stack to column of different suit
+          F(T) = N
+      3A  F(S) = L(US)           move entire stack to empty column
+          F(T) = L(S)
+      3B  F(S) = L(S) - N        move partial stack to empty column
+          F(T) = N
+   -  One possible scoring scheme is the differential in total
+      number of cards in the source and target columns,
+      i.e., Score = F(S)+F(T)-L(S)-L(T).  So the scores are:
+      1A  Score = L(US)
+      1B  Score = 0
+      2A  Score = L(US) - L(T)
+      2B  Score = -L(T)
+      3A  Score = L(US)
+      3B  Score = 0
+      -  Interestingly, the case scores are all independent of N
+      -  The really tricky part about assigning a score are cases 1B and 3B.
+         The net stack length change is exactly zero regardless of the number
+         of cards moved.  But the before-after scores of the move *should*
+         be different.  For example, if we start with L(S)=4 & L(T)=3,
+         we can end up with either F(S)=1 & F(T)=6, or F(S)=3 & F(T)=4.
+         The former case seems to be more promising than the latter.
+         How do we quantify that?
+      -  What seems to be missing is that creating longer stacks is not
+         rewarded sufficiently.  For example, case 1A creates both a longer
+         stack (of the moving suit) and reveals another stack (under the
+         moving stack).  Yet the score function only rewards the latter part.
+   -  To encourage longer stacks, another scoring scheme might be
+      the maximum final stack length between the source and target
+      columns: Score = Max(F(S), F(T)).
+
+-  Alternative formulation
+   -  Nomenclature
+      N = number of cards moved
+      First letter is B(efore) or A(fter)
+      Second letter is S(ource) or T(arget)
+      BS(top) = number of cards in top source stack
+      BT(top) = number of cards in top target stack
+      Same = if top source and target stacks are of the same suit
+      Partial = N < BS(top)
+      BS(next) = number of cards in second source stack  if not Partial
+                       0                                       if Partial
+      AS(top) = BS(next)                                 if not Partial
+                BS(top) - N                              if Partial
+      AT(top) = N + BT(top)                              if Same
+                N                                        if not Same
+   -  Differential in total cards
+      DTC = AS(top) + AT(top) - BS(top) - BT(top)
+   -  Differential in max length
+      DML = Max(AS(top), AT(top)) - Max(BS(top), BT(top))
+   -  Score = DTC + DML

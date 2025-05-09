@@ -512,107 +512,58 @@ function board_to_board(state) {
         // larger stacks.
 
         // console.log("can move: " + col + ", " + row + " => " + tcol);
-        let primary = [];
-        let secondary = [];
-        let tertiary = [];
+        let moves = [];
         let fstack = stacks[fcol];
         if (fstack.length == 0) {
             // If "from" column is empty, there are no moves available.
-            return [primary, secondary, tertiary];
+            return moves;
         }
         let tstack = stacks[tcol];
         let fc = state.board[fcol];
         let tc = state.board[tcol];
-        if (tc.length == 0) {
-            // If the "to" column is empty, we try to move different
-            // number of cards from the column.  The only move we
-            // do not attempt is to move all of the "from" column
-            // (starting with row 0) to the "to" column since that
-            // cannot help find a solution.
-            let row = fstack.row;
-            if (row != 0) {
-                let move = { type: "board_to_board",
-                             card: fc[row],
-                             apply_func: apply_board_to_board,
-                             from_col: fcol,
-                             from_row: row,
-                             to_col: tcol,
-                             score: fstack.length - row };
-                primary.push(move);
-            }
-            /* Do not bother with partial stack moves to empty columns
-            while (++row < fc.length) {
-                let move = { type: "board_to_board",
-                             card: fc[row],
-                             apply_func: apply_board_to_board,
-                             from_col: fcol,
-                             from_row: row,
-                             to_col: tcol,
-                             score: fstack.length - row };
-                secondary.push(move);
-            }
-            */
-        } else {
-            let tcard = tc[tc.length - 1];
-            for (let row = fstack.row; row < fc.length; row++) {
-                let fcard = fc[row];
-                if (tcard.rank != RankAbove[fcard.rank])
-                    continue;
-                let move = { type: "board_to_board",
-                             card: fcard,
-                             apply_func: apply_board_to_board,
-                             from_col: fcol,
-                             from_row: row,
-                             to_col: tcol };
-                let under_score = -1;
-                if (row == fstack.row && row > 0) {
-                    // We are moving the entire stack and exposing
-                    // the one underneath, so our score is potentially
-                    // higher if the underneath stack is large
-                    let ts = top_stack(fstack.col, fstack.row - 1);
-                    under_score = ts.length;
-                }
-                let moving = fc.length - row;
-                // There are three possibilities:
-                // - The destination column is a different suit than the
-                //   source stack.  This is a secondary move that we can
-                //   explore later (after dealing from stock).
-                //   Do not bother moving a partial stack over another
-                //   suit since that rarely results in a solution.
-                // - We are moving the entire stack to a new column.
-                //   We want to explore this first since it reveals
-                //   a new stack under the current one.
-                // - We are moving part of the stack to a new column.
-                //   This can be useful if we are creating a larger
-                //   stack in the new column, which we can explore
-                //   now; otherwise, we explore later (after moving
-                //   entire stacks onto different suits).
-                if (fcard.suit != tcard.suit) {
-                    move.score = Math.max(moving, under_score);
-                    if (row == fstack.row)
-                        secondary.push(move);
-                } else {
-                    move.score = Math.max(moving + tstack.length, under_score);
-                    if (move.score > fstack.length)
-                    // if (row == fstack.row)
-                        primary.push(move);
-                    else
-                    //    secondary.push(move);
-                        tertiary.push(move);
-                }
-                break;
-            }
+        let fstack2 = top_stack(fstack.col, fstack.row - 1);
+        let bs_top = fstack.length;
+        let bt_top = tstack.length;
+        let tcard = tc.length > 0 ? tc[tc.length - 1] : null;
+        for (let i = 0; i < fstack.length; i++) {
+            let row = fstack.row + i;
+            let fcard = fc[row];
+            if (tcard && tcard.rank != RankAbove[fcard.rank])
+                // The (partial) stack can only be moved if the top moving
+                // card is exactly one rank below the top target card
+                continue;
+            let n = fstack.length - i;
+            let partial = n > 0;
+            let same = tcard ? tcard.suit == fcard.suit : false;
+            let bs_next = partial ? 0 : fstack2.length;
+            let as_top = partial ? bs_top - n : bs_next;
+            let at_top = same ? bt_top + n : n;
+            let dtc = as_top + at_top - bs_top - bt_top;
+            let dml = Math.max(as_top, at_top) - Math.max(bs_top, bt_top);
+            let score = dtc + dml;
+            if (score < 0)
+                // Do not bother with bad moves
+                continue;
+            let move = { type: "board_to_board",
+                         card: fc[row],
+                         apply_func: apply_board_to_board,
+                         from_col: fcol,
+                         from_row: row,
+                         to_col: tcol,
+                         score: score };
+            moves.push(move);
+            // Since only one card in stack is exactly one rank below
+            // the top target card, we can stop after finding it
+            break;
         }
-        return [primary, secondary, tertiary];
+        return moves;
     }
 
     // First we find the stacks (consecutive cards of the same suit)
     // for each column.  If any stack is complete (A->K), we create
-    // a primary move to put the stack away.
+    // a move to put the stack away.
     let complete_moves = [];
-    let primary_moves = [];
-    let secondary_moves = [];
-    let tertiary_moves = [];
+    let board_moves = [];
     let stacks = [];
     for (let col = 0; col < SpiderNumCols; col++) {
         let stack = top_stack(col, -1);
@@ -630,10 +581,8 @@ function board_to_board(state) {
         for (let tcol = 0; tcol < SpiderNumCols; tcol++) {
             if (fcol == tcol)
                 continue;
-            let [p_moves, s_moves, t_moves] = can_move(stacks, fcol, tcol);
-            primary_moves.push(...p_moves);
-            secondary_moves.push(...s_moves);
-            tertiary_moves.push(...t_moves);
+            let moves = can_move(stacks, fcol, tcol);
+            board_moves.push(...moves);
         }
     }
     // combine secondary and tertiary moves since they will all
@@ -641,12 +590,9 @@ function board_to_board(state) {
     function compare_moves(m1, m2) {
         return m2.score - m1.score;
     }
-    primary_moves.sort(compare_moves);
-    secondary_moves.sort(compare_moves);
-    tertiary_moves.sort(compare_moves);
-    secondary_moves.push(...tertiary_moves);
-    complete_moves.push(...primary_moves);
-    return [complete_moves, secondary_moves];
+    board_moves.sort(compare_moves);
+    complete_moves.push(...board_moves);
+    return complete_moves;
 }
 
 function apply_board_to_board(old_state, move, detailed) {
@@ -814,18 +760,11 @@ async function depth_first_search(stop_time) {
         // If none of these lead to a solution, we are at a dead end
 
         // console.log("find moves");
-        let [p_moves, s_moves] = board_to_board(old_state);
-        // console.log(p_moves);
-        // console.log(s_moves);
-        // Shifting cards from one column to another is divided into
-        // "primary" moves where all consecutive cards at the top of
-        // the column are moved, and "secondary" moves where some of
-        // the consecutive cards are left in the original column.
-        // We try the primary moves first, but only try secondary
-        // moves if dealing from stock does not yield a solution.
+        let b_moves = board_to_board(old_state);
+        // console.log(b_moves);
         let d_moves = stock_to_board(old_state);
         // console.log(d_moves);
-        let moves = p_moves.concat(d_moves, s_moves);
+        let moves = b_moves.concat(d_moves);
         // console.log(moves);
 
         // Try each move and see if we get a solution
@@ -981,18 +920,11 @@ async function breadth_first_search() {
         // If none of these lead to a solution, we are at a dead end
 
         // console.log("find moves");
-        let [p_moves, s_moves] = board_to_board(old_state);
-        // console.log(p_moves);
-        // console.log(s_moves);
-        // Shifting cards from one column to another is divided into
-        // "primary" moves where all consecutive cards at the top of
-        // the column are moved, and "secondary" moves where some of
-        // the consecutive cards are left in the original column.
-        // We try the primary moves first, but only try secondary
-        // moves if dealing from stock does not yield a solution.
+        let b_moves = board_to_board(old_state);
+        // console.log(b_moves);
         let d_moves = stock_to_board(old_state);
         // console.log(d_moves);
-        let moves = p_moves.concat(d_moves, s_moves);
+        let moves = b_moves.concat(d_moves);
         // console.log(moves);
 
         // Unlike depth first search, we just append resulting
