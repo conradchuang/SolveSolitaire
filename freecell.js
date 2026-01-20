@@ -891,10 +891,10 @@ async function solve() {
                 row--;
                 card = next_card;
             }
-            return { length: column.length - row,
-                     col: col,
-                     row: row,
-                     card: card };
+            return { length: column.length - row,   // # cards in stack
+                     col: col,                      // Index of column
+                     row: row,                      // Index of top of stack
+                     card: card };                  // Top of stack card
         }
 
         function can_move(stacks, fcol, tcol, max_stack) {
@@ -925,10 +925,10 @@ async function solve() {
                 // do not attempt is to move all of the "from" column
                 // (starting with row 0) to the "to" column since that
                 // cannot help find a solution.
-                let count = 1;
                 for (let row = fstack.row; row < fc.length; row++) {
-                    if (count++ >= max_stack)
-                        break;
+                    let moving = fc.length - row;
+                    if (moving > max_stack)
+                        continue;
                     let move = { type: "board_to_board",
                                  card: fc[row],
                                  apply_func: apply_board_to_board,
@@ -946,10 +946,10 @@ async function solve() {
                 }
             } else {
                 let tcard = tc[tc.length - 1];
-                let count = 1;
                 for (let row = fstack.row; row < fc.length; row++) {
-                    if (count++ >= max_stack)
-                        break;
+                    let moving = fc.length - row;
+                    if (moving > max_stack)
+                        continue;
                     let fcard = fc[row];
                     if (tcard.rank != RankAbove[fcard.rank] ||
                         tcard.is_red == fcard.is_red)
@@ -978,7 +978,6 @@ async function solve() {
                     if (row == fstack.row)
                         primary.push(move);
                     else {
-                        let moving = fc.length - row;
                         if (moving + tstack.length > fstack.length)
                             secondary.push(move);
                         else
